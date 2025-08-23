@@ -1,0 +1,5 @@
+token.pickle
+client_secret*.json
+credentials.json
+__pycache__
+priorities.csv
