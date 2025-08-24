@@ -254,7 +254,7 @@ class GmailLabeler:
             print(f"An error occurred while getting email details: {error}")
             return None
 
-    def add_label_to_thread(self, thread_id, label_id):
+    def add_label_to_thread(self, thread_id, label_id, label_name = None):
         """Add label to a specific thread"""
         service = self.service
         try:
@@ -273,7 +273,11 @@ class GmailLabeler:
             result = service.users().messages().batchModify(
                 userId='me', body=body).execute()
 
-            print(f"Successfully added label to thread with {len(message_ids)} messages")
+            if label_name is None:
+                print(f"Successfully added label to thread with {len(message_ids)} messages")
+            else:
+                print(f"Successfully added label {label_name} to thread with {len(message_ids)} messages")
+
             return True
 
         except HttpError as error:
@@ -432,6 +436,18 @@ class GmailLabeler:
         unprioritized_thread_count = len(thread_ids)
         thread_ids = self.search_threads("label:inbox", 10000)
         print(f"{len(thread_ids)} threads in inbox, {unprioritized_thread_count} are unprioritized")
+
+        priorityEmailsNotInInbox = "is:unread -label:inbox after:" + self.date_n_days_ago(14)
+        plabels = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10"]
+        prioritized_label_id = self.label_id("prioritized", labels)
+        for plabel in plabels:
+            label_id = self.label_id(plabel, labels)
+            query = priorityEmailsNotInInbox + f" label:{plabel}"
+            thread_ids = self.search_threads(query, 10000)
+            for thread_id in thread_ids:
+                self.add_label_to_thread(thread_id, prioritized_label_id)
+            print(f"Found {len(thread_ids)} threads, query={query}")
+        print("Search for these emails using the query: " + priorityEmailsNotInInbox + " label:prioritized")
 
     def date_n_days_ago(self, daysAgo, date_format="%Y/%m/%d"):
         """
