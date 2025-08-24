@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from collections import Counter
 import GoogleDriveCSVDownloader
-import GoogleCSVSheetDownloader
+import GoogleSpreadsheetUtil
 from email.utils import parseaddr
 from datetime import datetime, timedelta
 import csv
@@ -33,7 +33,7 @@ def csv_to_dict_list(file_path):
 
 
 # Gmail API scope for reading and modifying emails
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/spreadsheets.readonly']
+SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/spreadsheets']
 
 
 class GmailLabeler:
@@ -79,6 +79,32 @@ class GmailLabeler:
         except HttpError as error:
             print(f"An error occurred during authentication: {error}")
             return None
+
+    def archive_thread(self, thread_id):
+        """Archive a specific thread by removing INBOX label"""
+        service = self.service
+        try:
+            # Get all messages in the thread
+            thread = service.users().threads().get(
+                userId='me', id=thread_id).execute()
+
+            message_ids = [msg['id'] for msg in thread['messages']]
+
+            # Remove INBOX label from all messages in thread (archives them)
+            body = {
+                'ids': message_ids,
+                'removeLabelIds': ['INBOX']
+            }
+
+            result = service.users().messages().batchModify(
+                userId='me', body=body).execute()
+
+            print(f"Successfully archived thread with {len(message_ids)} messages")
+            return True
+
+        except HttpError as error:
+            print(f'An error occurred: {error}')
+            return False
 
     def get_labels(self):
         """Get all available labels in the Gmail account."""
@@ -388,7 +414,7 @@ class GmailLabeler:
                 threads += 1
                 print(f"Updated {threads}/{totalThreads} threads")
 
-    def count_by_priority_labels(self, labels):
+    def count_by_priority_inbox(self, labels):
         plabels = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p_unknown", "@ReadyToArchive"]
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
@@ -602,24 +628,19 @@ class GmailLabeler:
             return None
 
     def label_emails_by_priority(self, priorities, labels):
-        unprioritized_emails = "label:inbox -label:@ReadyToArchive -label:p0 -label:p9 -label:p8 -label:p7 -label:p6 -label:p5 -label:p4 -label:p3 -label:p2 -label:p1 -label:p0 -label:p10 -label:p_unknown"
-        # Search for emails
-        thread_ids = self.search_threads(unprioritized_emails, 10000)
-        totalThreads = len(thread_ids)
-        threads = 0
+        unprioritized_emails = " -label:@ReadyToArchive -label:p0 -label:p9 -label:p8 -label:p7 -label:p6 -label:p5 -label:p4 -label:p3 -label:p2 -label:p1 -label:p0 -label:p10 -label:p_unknown"
 
-        print(f"Found {len(thread_ids)} threads for query: {unprioritized_emails}")
-        for thread_id in thread_ids:
-            threads += 1
-            thread_details = self.get_thread_details(thread_id)
-            sender = self.getSenderFromThreadDetails(thread_details)
-            name, email = parseaddr(sender)
-            priority = self.priority_by_email(priorities, email)
-            label_id = self.label_id(priority, labels)
-            self.add_label_to_thread(thread_id, label_id)
-            print(
-                f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, email={email} label_id={label_id}")
-            print("")
+        print()
+        print("Adding priority labels to inbox...")
+        unprioritized_emails_inbox = "label:inbox" + unprioritized_emails
+        self.add_priority_labels(labels, priorities, unprioritized_emails_inbox)
+        print()
+
+        print("Adding priority labels to unread in last 3d...")
+        date3DaysAgo = self.date_n_days_ago(3.0)
+        unprioritized_emails_unread_3d = f"is:unread after:{date3DaysAgo}" + unprioritized_emails
+        self.add_priority_labels(labels, priorities, unprioritized_emails_unread_3d)
+        print()
 
         # find emails marked unpriroitized that have known priorities and remove the unknown priority label
         unknown_senders_query = "label:p_unknown"
@@ -637,6 +658,7 @@ class GmailLabeler:
                 self.remove_label_from_thread(thread_id, p_unknown_id, "p_unknown")
             else:
                 unknown_senders.add(email.lower())
+            print(".", end="", flush=True)
 
         print("")
         print("Unknown senders:")
@@ -644,26 +666,44 @@ class GmailLabeler:
             print(sender)
         print("")
 
+    def add_priority_labels(self, labels, priorities, unprioritized_emails):
+        # Search for emails
+        thread_ids = self.search_threads(unprioritized_emails, 10000)
+        totalThreads = len(thread_ids)
+        threads = 0
+        print(f"Found {len(thread_ids)} threads for query: {unprioritized_emails}")
+        for thread_id in thread_ids:
+            threads += 1
+            thread_details = self.get_thread_details(thread_id)
+            sender = self.getSenderFromThreadDetails(thread_details)
+            name, email = parseaddr(sender)
+            priority = self.priority_by_email(priorities, email)
+            label_id = self.label_id(priority, labels)
+            self.add_label_to_thread(thread_id, label_id)
+            print(
+                f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, email={email} label_id={label_id}")
+            print("")
 
-def option_a():
+
+def label_emails():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
 
-    downloader = GoogleCSVSheetDownloader.GoogleSheetCSVDownloader()
+    downloader = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
     downloader.download_sheet_by_url(
         "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1339297741",
         "senders2priority", "priorities.csv")
     priorities = csv_to_dict_list("priorities.csv")
     print(f"Read {len(priorities)} rows for senders2priority (Email Senders google sheet)")
     labeler.label_emails_by_priority(priorities, labels)
-    labeler.count_by_priority_labels(labels)
+    labeler.count_by_priority_inbox(labels)
     return True
 
 
-def option_b():
+def count_by_priority_inbox():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
-    labeler.count_by_priority_labels(labels)
+    labeler.count_by_priority_inbox(labels)
     return True
 
 def option_3():
@@ -676,17 +716,50 @@ def option_4():
     labels = labeler.count_sanelater_threads()
     return True
 
+def daily_email_routine():
+    label_emails()
+    return True
+
+def append_unknown_senders():
+    emailService = GmailLabeler()
+    unknown_senders = set()
+    thread_ids = emailService.search_threads("label:inbox label:p_unknown")
+    for thread_id in thread_ids:
+        thread_details = emailService.get_thread_details(thread_id)
+        unknown_sender = emailService.getSenderFromThreadDetails(thread_details)
+        name, email_addr = parseaddr(unknown_sender)
+        unknown_senders.add(email_addr)
+
+    print("")
+    print(f"Found {len(unknown_senders)} unknown senders")
+    data = []
+    for sender in unknown_senders:
+        print(sender)
+        data.append([sender])
+    print("")
+
+
+    sheet_url = "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1304305670#gid=1304305670"
+    sheetUtils = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
+    sheet_id = sheetUtils.extract_spreadsheet_id(sheet_url)
+    sheetUtils.append_multiple_rows(sheet_id, "unknown_senders", data)
+    print(f"Finished appending unknown senders to {sheet_url}")
+
+
+
 def goodbye():
     print("Goodbye!")
     return False
 
 def main():
     options = {
-        '1': ('Label Emails', option_a),
-        '2': ('Show Email Stats', option_b),
-        '3': ('Show Threads stats', option_3),
-        '4': ('Show SaneLater stats', option_4),
-        '5': ('Exit', goodbye)
+        '1': ('Daily Email Routine', daily_email_routine),
+        '2': ('Label Emails', label_emails),
+        '3': ('Inbox: Count by Priority', count_by_priority_inbox),
+        '4': ('Show Threads stats', option_3),
+        '5': ('Show SaneLater stats', option_4),
+        '6': ('Append unknown senders', append_unknown_senders),
+        '7': ('Exit', goodbye)
     }
 
     while True:

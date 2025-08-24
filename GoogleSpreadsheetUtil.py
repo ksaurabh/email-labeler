@@ -11,10 +11,10 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # Google Sheets API scope
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 
-class GoogleSheetCSVDownloader:
+class GoogleSpreadsheetUtil:
     def __init__(self, credentials_file='credentials.json', token_file='token.pickle'):
         """
         Initialize the Google Sheets CSV downloader.
@@ -61,6 +61,33 @@ class GoogleSheetCSVDownloader:
         except Exception as e:
             print(f"❌ Authentication error: {e}")
 
+    def append_multiple_rows(self, spreadsheet_id, sheet_name, values_array):
+        """Append multiple rows of values to a sheet"""
+        service = self.service
+        try:
+            # Prepare the range
+            range_name = f'{sheet_name}!A:A'
+
+            body = {
+                'values': values_array
+            }
+
+            result = service.spreadsheets().values().append(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption='RAW',  # Use 'USER_ENTERED' for formulas
+                insertDataOption='INSERT_ROWS',
+                body=body
+            ).execute()
+
+            rows_added = len(values_array)
+            print(f"Appended {rows_added} rows to {sheet_name}")
+            return result
+
+        except HttpError as error:
+            print(f'An error occurred: {error}')
+            return None
+
     def extract_spreadsheet_id(self, url):
         """
         Extract spreadsheet ID from Google Sheets URL.
@@ -83,6 +110,33 @@ class GoogleSheetCSVDownloader:
                 return match.group(1)
 
         return None
+
+    def append_multiple_rows(self, spreadsheet_id, sheet_name, values_array):
+        """Append multiple rows of values to a sheet"""
+        service = self.service
+        try:
+            # Prepare the range
+            range_name = f'{sheet_name}!A:A'
+
+            body = {
+                'values': values_array
+            }
+
+            result = service.spreadsheets().values().append(
+                spreadsheetId=spreadsheet_id,
+                range=range_name,
+                valueInputOption='RAW',  # Use 'USER_ENTERED' for formulas
+                insertDataOption='INSERT_ROWS',
+                body=body
+            ).execute()
+
+            rows_added = len(values_array)
+            print(f"Appended {rows_added} rows to {sheet_name}")
+            return result
+
+        except HttpError as error:
+            print(f'An error occurred: {error}')
+            return None
 
     def get_sheet_metadata(self, spreadsheet_id):
         """
@@ -335,7 +389,7 @@ def main():
 
     if choice == "1":
         # Authenticated download
-        downloader = GoogleSheetCSVDownloader()
+        downloader = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
 
         if downloader.service is None:
             print("❌ Authentication failed. Cannot proceed.")
