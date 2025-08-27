@@ -1,6 +1,7 @@
 import os
 import pickle
 import re
+import time
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -13,6 +14,10 @@ import GoogleSpreadsheetUtil
 from email.utils import parseaddr
 from datetime import datetime, timedelta
 import csv
+from email.utils import parsedate_tz
+from email.utils import formatdate
+import datetime
+
 from email.utils import parseaddr
 
 def get_domain(email_str):
@@ -488,6 +493,10 @@ class GmailLabeler:
         unprioritized_thread_count = len(unprioritized_threads)
         print(f"unprioritized_thread_count={unprioritized_thread_count}")
 
+        # self.label_prioritized_emails_not_in_inbox(labels)
+
+    def label_prioritized_emails_not_in_inbox(self):
+        labels = self.get_labels()
         priorityEmailsNotInInbox = "is:unread -label:inbox after:" + self.date_n_days_ago(14)
         plabels = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10"]
         prioritized_label_id = self.label_id("prioritized", labels)
@@ -568,9 +577,9 @@ class GmailLabeler:
             details = self.get_thread_details(id)
             fetched_threads += 1
 
-            fromAddr = self.getSenderFromThreadDetails(details)
+            fromAddr = self.get_thread_sender(details)
             domain = get_domain(fromAddr)
-            subject = details['messages'][0]['Subject']
+            subject = self.get_thread_subject(details)
 
             print(f"From: {fromAddr}")
             print(f"Subject: {subject}")
@@ -596,9 +605,15 @@ class GmailLabeler:
         for x in sorted_by_count:
             print(f"{x[1]} \t {x[0]}")
 
-    def getSenderFromThreadDetails(self, details):
+    def get_thread_subject(self, details):
+        return details['messages'][0]['Subject']
+
+    def get_thread_sender(self, details):
         fromAddr = details['messages'][0]['From']
         return fromAddr
+    def get_thread_max_date_string(self, details):
+        max_date_string = details['max_date_string']
+        return max_date_string
 
     def search_threads(self, query, max_results=10):
         """
@@ -625,6 +640,34 @@ class GmailLabeler:
             print(f'An error occurred: {error}')
             return []
 
+    def format_datetime_tuple(self, dt_tuple, format_string="%Y-%m-%d %H:%M:%S"):
+        """
+        Format a datetime tuple to string
+
+        Args:
+            dt_tuple: Tuple in format (year, month, day, hour, minute, second, weekday, yearday, dst)
+                     or shorter tuple like (year, month, day, hour, minute, second)
+            format_string: strftime format string
+
+        Returns:
+            str: Formatted date string
+        """
+        try:
+            # Handle different tuple lengths
+            if len(dt_tuple) >= 6:
+                dt_obj = datetime.datetime(*dt_tuple[:6])
+            elif len(dt_tuple) >= 3:
+                # Pad with zeros for missing time components
+                padded_tuple = dt_tuple + (0,) * (6 - len(dt_tuple))
+                dt_obj = datetime.datetime(*padded_tuple)
+            else:
+                raise ValueError("Tuple must have at least year, month, day")
+
+            return dt_obj.strftime(format_string)
+
+        except (TypeError, ValueError) as e:
+            return f"Error formatting tuple: {e}"
+
     def get_thread_details(self, thread_id):
         """
         Get full details of a specific thread
@@ -642,14 +685,26 @@ class GmailLabeler:
             ).execute()
 
             messages = []
+            mostRecentDate = ""
+            max_date_string = ''
             for message in thread['messages']:
                 msg_details = self.parse_message(message)
                 messages.append(msg_details)
+                headers = message['payload']['headers']
+                date_tuple = None
+                date_string = ''
+                for header in headers:
+                    if header['name'] == 'Date':
+                        date_tuple = parsedate_tz(header['value'])
+                        date_string = self.format_datetime_tuple(date_tuple, "%Y-%m-%d %H:%M:%S")
+                        if date_string > max_date_string:
+                            max_date_string = date_string
 
             return {
                 'thread_id': thread_id,
                 'message_count': len(messages),
-                'messages': messages
+                'messages': messages,
+                'max_date_string': max_date_string
             }
 
         except HttpError as error:
@@ -739,6 +794,14 @@ class GmailLabeler:
                 self.add_label_to_thread(thread_id, label_id)
         print()
 
+        p_cat_labels = ["p_very_high", "p_high", "p_medium", "p_low", "unprioritized", "@ReadyToArchive"]
+        for label in p_cat_labels:
+            query = "label:inbox label:" + label
+            thread_ids = self.search_threads(query, 1000)
+            print(f"{len(thread_ids)} threads for query: {query}")
+        print("")
+
+
     # find emails marked unpriroitized that have known priorities and remove the unknown priority label
     def prioritize_last14d_emails_unknown_senders(self, labels, priorities):
         unknown_senders_query = "label:p_unknown after:" + self.date_n_days_ago(14)
@@ -748,7 +811,7 @@ class GmailLabeler:
         unknown_senders = set()
         for thread_id in thread_ids:
             thread_details = self.get_thread_details(thread_id)
-            sender = self.getSenderFromThreadDetails(thread_details)
+            sender = self.get_thread_sender(thread_details)
             name, email = parseaddr(sender)
             priority = self.priority_by_email(priorities, email)
             if priority != "p_unknown":
@@ -783,23 +846,71 @@ class GmailLabeler:
         for thread_id in thread_ids:
             threads += 1
             thread_details = self.get_thread_details(thread_id)
-            sender = self.getSenderFromThreadDetails(thread_details)
+            thread_labels = self.get_thread_labels_simple(thread_id)
+            sender = self.get_thread_sender(thread_details)
             name, email = parseaddr(sender)
-            priority = self.priority_by_email(priorities, email)
-            label_id = self.label_id(priority, labels)
-            self.add_label_to_thread(thread_id, label_id)
-            if priority == "p9" or priority == "p10":
-                high_label_id = self.label_id("p_high",labels)
-                self.add_label_to_thread(thread_id, high_label_id)
 
-            print(
-                f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, email={email} label_id={label_id}")
-            print("")
+            priority = self.priority_by_email(priorities, email)
+            if not thread_labels.__contains__(priority):
+                label_id = self.label_id(priority, labels)
+                self.add_label_to_thread(thread_id, label_id)
+                if priority == "p9" or priority == "p10":
+                    high_label_id = self.label_id("p_high",labels)
+                    self.add_label_to_thread(thread_id, high_label_id)
+
+                date_string = self.get_thread_max_date_string(thread_details)
+                print(f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, rcvd={date_string} email={email} labels={thread_labels} label_id={label_id}")
+                print("")
 
 def label_emails_w_p_category():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
     labeler.label_emails_by_priority_category(labels)
+
+def continuously_remove_p_category_from_archived_emails():
+    while True:
+        try:
+            remove_p_category_from_archived_emails()
+        except:
+            pass
+        print("sleeping for 10 seconds")
+        time.sleep(10)
+
+def remove_p_category_from_archived_emails():
+    labeler = GmailLabeler()
+    labels = labeler.get_labels()
+
+    print("Removing p_cat_labels from archived emails")
+    p_cat_labels = ['p_very_high', 'p_high', 'p_medium', 'p_low']
+    for p_cat_label in p_cat_labels:
+        query = f"label:{p_cat_label} -label:inbox"
+        thread_ids = labeler.search_threads(query, 1000)
+        print(f"Found {len(thread_ids)} for query: " + query)
+        for thread_id in thread_ids:
+            thread_details = labeler.get_thread_details(thread_id)
+            sender = labeler.get_thread_sender(thread_details)
+            subject = labeler.get_thread_subject(thread_details)
+
+
+            thread_labels = labeler.get_thread_labels_simple(thread_id)
+
+            isArchived = True
+            # print()
+            # print(f"Thread Labels: {thread_labels}")
+            for label in thread_labels:
+                if str(label).lower() == "inbox":
+                    isArchived = False
+                    break
+            # print(f"thread_id: {thread_id} isArchived:{isArchived}")
+            if isArchived:
+                print()
+                print(f"{sender} \t {subject} ")
+                print(thread_labels)
+                print(f"Removing label {p_cat_label}")
+
+                label_id = labeler.label_id(p_cat_label, labels)
+                labeler.remove_label_from_thread(thread_id, label_id, p_cat_label)
+            print(".", end="", flush=True)
 
 
 def label_emails():
@@ -848,6 +959,11 @@ def download_sender_priorities():
 
     return senders2priority
 
+def label_prioritized_emails_not_in_inbox():
+    labeler = GmailLabeler()
+    labeler.label_prioritized_emails_not_in_inbox()
+    return True
+
 
 def count_by_priority_inbox():
     labeler = GmailLabeler()
@@ -890,7 +1006,7 @@ def calculate_domain_priority():
     new_domains = []
     for thread_id in thread_ids:
         thread_details = emailService.get_thread_details(thread_id)
-        unknown_sender = emailService.getSenderFromThreadDetails(thread_details)
+        unknown_sender = emailService.get_thread_sender(thread_details)
         name, email_addr = parseaddr(unknown_sender)
         domain = re.findall(r'\w+\.\w+$', email_addr)[0]
         if not domain_priority.keys().__contains__(domain):
@@ -908,7 +1024,7 @@ def append_unknown_senders():
     thread_ids = emailService.search_threads("label:inbox label:p_unknown")
     for thread_id in thread_ids:
         thread_details = emailService.get_thread_details(thread_id)
-        unknown_sender = emailService.getSenderFromThreadDetails(thread_details)
+        unknown_sender = emailService.get_thread_sender(thread_details)
         name, email_addr = parseaddr(unknown_sender)
         unknown_senders.add(email_addr)
 
@@ -936,8 +1052,8 @@ def goodbye():
 def main():
     # options_edit_them_here
     options = {
-        '1': ('Daily Email Routine', daily_email_routine),
-        '2': ('Inbox: Count by Priority', count_by_priority_inbox),
+        '1': ('Inbox: Count by Priority', count_by_priority_inbox),
+        '2': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox ),
         '3': ('Label Emails', label_emails),
         '4': ('Show Threads stats', option_3),
         '5': ('Show SaneLater stats', option_4),
@@ -945,7 +1061,10 @@ def main():
         '7': ('Calcualte domain priority', calculate_domain_priority),
         '8': ('Prioritize last14d emails from unknown senders', prioritize_last14d_emails_unknown_senders),
         '9': ('Add priority category labels (assumes threads already have priority labels)', label_emails_w_p_category),
-        '10': ('Exit', goodbye)
+        '10': ('Remove p_cat_labels from archived emails ', remove_p_category_from_archived_emails),
+        '11': ('Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
+        '12': ('Daily Email Routine', daily_email_routine),
+        '13': ('Exit', goodbye)
     }
 
     while True:
