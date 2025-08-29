@@ -16,7 +16,6 @@ from datetime import datetime, timedelta
 import csv
 from email.utils import parsedate_tz
 from email.utils import formatdate
-import datetime
 
 from email.utils import parseaddr
 
@@ -114,7 +113,7 @@ class GmailLabeler:
             return True
 
         except HttpError as error:
-            print(f'An error occurred: {error}')
+            print(f'An error occurred - archive_thread: {error}')
             return False
 
     def get_labels(self):
@@ -152,7 +151,7 @@ class GmailLabeler:
             return True
 
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred - move_thread_to_inbox: {error}")
             return False
 
     def remove_label_from_thread(self, thread_id: str, label_id, label_name,
@@ -182,7 +181,7 @@ class GmailLabeler:
             return True
 
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred - remove_label_from_thread: {error}")
             return False
 
     def create_label(self, label_name):
@@ -286,7 +285,7 @@ class GmailLabeler:
             return True
 
         except HttpError as error:
-            print(f'An error occurred: {error}')
+            print(f'An error occurred - add_label_to_thread: {error}')
             return False
 
     def add_label_to_email(self, email_id, label_id):
@@ -407,7 +406,7 @@ class GmailLabeler:
             return True
 
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred - mark_thread_as_read: {error}")
             return False
 
     def label_id(self, label_name, labels):
@@ -457,27 +456,38 @@ class GmailLabeler:
         """
         service = self.service
         labels = self.get_labels()
-        thread = service.users().threads().get(
-            userId=user_id,
-            id=thread_id,
-            format='metadata'
-        ).execute()
+        try:
+            thread = service.users().threads().get(
+                userId=user_id,
+                id=thread_id,
+                format='metadata'
+            ).execute()
 
-        # Collect all unique label IDs from thread messages
-        label_ids = set()
-        for message in thread.get('messages', []):
-            label_ids.update(message.get('labelIds', []))
+            # Collect all unique label IDs from thread messages
+            label_ids = set()
+            for message in thread.get('messages', []):
+                label_ids.update(message.get('labelIds', []))
 
-        # Get all labels to map IDs to names
-        label_names = []
-        for id in label_ids:
-            label_names.append(self.label_name(id, labels))
-        return label_names
+            # Get all labels to map IDs to names
+            label_names = []
+            for id in label_ids:
+                label_names.append(self.label_name(id, labels))
+                return label_names
+        except HttpError as error:
+            print(f'An error occurred - get_thread_labels_simple: {error}')
+            return []
 
     plabels = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p_unknown", "@ReadyToArchive"]
+    p_cat_labels = ["p_very_high", "p_high", "p_medium", "p_low",  "p_unknown", "@ReadyToArchive"]
 
     def count_by_priority_inbox(self, labels):
-        plabels = self.plabels
+        startTime = time.time()
+        self.count_by_priority_inbox_untimed(labels)
+        timeElapsed = int(time.time() - startTime)
+        print(f"Time elapesed {timeElapsed} seconds")
+
+    def count_by_priority_inbox_untimed(self, labels):
+        plabels = self.p_cat_labels
         total_prioritized_thread_count = 0
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
@@ -487,7 +497,7 @@ class GmailLabeler:
 
         thread_ids = self.search_threads("label:inbox", 10000)
         total_threads = len(thread_ids)
-        print(f"{total_threads} threads in inbox")
+        print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}")
 
         unprioritized_threads = self.unprioritized_threads_inbox()
         unprioritized_thread_count = len(unprioritized_threads)
@@ -497,13 +507,15 @@ class GmailLabeler:
 
     def label_prioritized_emails_not_in_inbox(self):
         labels = self.get_labels()
-        priorityEmailsNotInInbox = "is:unread -label:inbox after:" + self.date_n_days_ago(14)
+        exclude_query = "label:inbox"
+        priorityEmailsNotInInbox = "is:unread  after:" + self.date_n_days_ago(14) + f"-({exclude_query})"
+        includeQuery = "is:unread  after:" + self.date_n_days_ago(14)
         plabels = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10"]
         prioritized_label_id = self.label_id("prioritized", labels)
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
-            query = priorityEmailsNotInInbox + f" label:{plabel}"
-            thread_ids = self.search_threads(query, 10000)
+            query = includeQuery + f" label:{plabel}"
+            thread_ids = self.search_threads_w_exclusion(query, exclude_query, 10000)
             for thread_id in thread_ids:
                 self.add_label_to_thread(thread_id, prioritized_label_id)
             print(f"Found {len(thread_ids)} threads, query={query}")
@@ -511,7 +523,10 @@ class GmailLabeler:
 
     def unprioritized_threads_inbox(self):
         unprioritized_inbox_threads_query = "label:inbox -label:@ReadyToArchive -label:p0 -label:p9 -label:p8 -label:p7 -label:p6 -label:p5 -label:p4 -label:p3 -label:p2 -label:p1 -label:p0 -label:p10 -label:p_unknown"
-        thread_ids = self.search_threads(unprioritized_inbox_threads_query, 10000)
+
+        excluded_queries = self.get_excluded_plabel_queries()
+
+        thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_inbox_threads_query, excluded_queries, 10000)
         print("Running search for unprioritized emails in inbox")
         print(f"query={unprioritized_inbox_threads_query}")
         print(f"search threads returned {len(thread_ids)} threads..checking their messages for plabels")
@@ -525,6 +540,12 @@ class GmailLabeler:
         print()
         print("You can look for these emails with query: label:inbox label:unprioritized")
         return unprioritized_threads
+
+    def get_excluded_plabel_queries(self):
+        excluded_queries = []
+        for plabel in self.plabels:
+            excluded_queries.append("label:" + plabel)
+        return excluded_queries
 
     def date_n_days_ago(self, daysAgo, date_format="%Y/%m/%d"):
         """
@@ -615,6 +636,30 @@ class GmailLabeler:
         max_date_string = details['max_date_string']
         return max_date_string
 
+    def search_threads_w_exclusion(self, include_query, exclude_query, max_results=10):
+        included_ids = self.search_threads(include_query, max_results)
+        excluded_ids = self.search_threads(exclude_query, max_results)
+
+        result = []
+        for id in included_ids:
+            if not excluded_ids.__contains__(id):
+                result.append(id)
+        return result
+
+    def search_threads_w_multiple_exclusions(self, include_query, exclude_queries, max_results=10):
+        included_ids = self.search_threads(include_query, max_results)
+        excluded_ids = set()
+        for exclude_query in exclude_queries:
+            ids = self.search_threads(exclude_query, max_results)
+            for id in ids:
+                excluded_ids.add(id)
+
+        result = []
+        for id in included_ids:
+            if not excluded_ids.__contains__(id):
+                result.append(id)
+        return result
+
     def search_threads(self, query, max_results=10):
         """
         Search for email threads using Gmail search syntax
@@ -637,7 +682,7 @@ class GmailLabeler:
             return [thread['id'] for thread in threads]
 
         except HttpError as error:
-            print(f'An error occurred: {error}')
+            print(f'An error occurred - search_threads: {error}')
             return []
 
     def format_datetime_tuple(self, dt_tuple, format_string="%Y-%m-%d %H:%M:%S"):
@@ -655,11 +700,11 @@ class GmailLabeler:
         try:
             # Handle different tuple lengths
             if len(dt_tuple) >= 6:
-                dt_obj = datetime.datetime(*dt_tuple[:6])
+                dt_obj = datetime(*dt_tuple[:6])
             elif len(dt_tuple) >= 3:
                 # Pad with zeros for missing time components
                 padded_tuple = dt_tuple + (0,) * (6 - len(dt_tuple))
-                dt_obj = datetime.datetime(*padded_tuple)
+                dt_obj = datetime(*padded_tuple)
             else:
                 raise ValueError("Tuple must have at least year, month, day")
 
@@ -708,7 +753,7 @@ class GmailLabeler:
             }
 
         except HttpError as error:
-            print(f'An error occurred: {error}')
+            print(f'An error occurred - get_thread_details: {error}')
             return None
 
     def parse_message(self, message):
@@ -749,7 +794,7 @@ class GmailLabeler:
             return thread_id
 
         except HttpError as error:
-            print(f"An error occurred: {error}")
+            print(f"An error occurred - get_thread_id_from_message_id: {error}")
             return None
 
     def label_emails_by_priority(self, priorities, labels):
@@ -758,13 +803,13 @@ class GmailLabeler:
         print()
         print("Adding priority labels to inbox...")
         unprioritized_emails_inbox = "label:inbox" + unprioritized_emails
-        self.add_priority_labels(labels, priorities, unprioritized_emails_inbox)
+        self.add_priority_labels_exclude_prioritized_emails(labels, priorities, unprioritized_emails_inbox)
         print()
 
         print("Adding priority labels to unread in last 3d...")
         date3DaysAgo = self.date_n_days_ago(3.0)
         unprioritized_emails_unread_3d = f"is:unread after:{date3DaysAgo}" + unprioritized_emails
-        self.add_priority_labels(labels, priorities, unprioritized_emails_unread_3d)
+        self.add_priority_labels_exclude_prioritized_emails(labels, priorities, unprioritized_emails_unread_3d)
         print()
 
     def label_emails_by_priority_category(self, labels):
@@ -837,15 +882,20 @@ class GmailLabeler:
             print("sheetsURL: " + sheets_url)
             print()
 
-    def add_priority_labels(self, labels, priorities, unprioritized_emails):
+    def add_priority_labels_exclude_prioritized_emails(self, labels, priorities, unprioritized_emails):
         # Search for emails
-        thread_ids = self.search_threads(unprioritized_emails, 10000)
+        excluded_queries = self.get_excluded_plabel_queries()
+        thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_emails, excluded_queries, 10000)
+        # thread_ids = self.search_threads(unprioritized_emails, 10000)
         totalThreads = len(thread_ids)
         threads = 0
         print(f"Found {len(thread_ids)} threads for query: {unprioritized_emails}")
         for thread_id in thread_ids:
             threads += 1
             thread_details = self.get_thread_details(thread_id)
+            if thread_details == None:
+                continue
+
             thread_labels = self.get_thread_labels_simple(thread_id)
             sender = self.get_thread_sender(thread_details)
             name, email = parseaddr(sender)
@@ -870,11 +920,14 @@ def label_emails_w_p_category():
 def continuously_remove_p_category_from_archived_emails():
     while True:
         try:
+            startTime = time.time()
             remove_p_category_from_archived_emails()
+            timeElapsed = int(time.time() - startTime)
+            print(f"Time elapesed {timeElapsed} seconds")
         except:
             pass
-        print("sleeping for 10 seconds")
-        time.sleep(10)
+        print("sleeping for 3 seconds")
+        time.sleep(3)
 
 def remove_p_category_from_archived_emails():
     labeler = GmailLabeler()
@@ -981,8 +1034,20 @@ def option_4():
     labels = labeler.count_sanelater_threads()
     return True
 
+def timedMethod(method):
+    startTime = time.time()
+    method()
+    timeElapsed = int(time.time() - startTime)
+    print(f"Time elapesed {timeElapsed} seconds")
+
 def daily_email_routine():
+    startTime = time.time()
     label_emails()
+    label_prioritized_emails_not_in_inbox()
+    label_emails_w_p_category()
+    count_by_priority_inbox()
+    timeElapsed = time.time() - startTime
+    print(f"Time elapesed {timeElapsed} seconds")
     return True
 
 sheetsUtil = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
