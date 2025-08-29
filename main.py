@@ -814,7 +814,8 @@ class GmailLabeler:
         print()
 
     def label_emails_by_priority_category(self, labels):
-        plabels = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "@ReadyToArchive", "p_unknown"]
+        # only consider labels that are priority medium, high, very_high
+        plabels = ["p2", "p6", "p7", "p8", "p9", "p10"]
 
         print()
         print("Adding priority category labels to inbox...")
