@@ -258,7 +258,7 @@ class GmailLabeler:
             print(f"An error occurred while getting email details: {error}")
             return None
 
-    def add_label_to_thread(self, thread_id, label_id, label_name = None):
+    def add_label_to_thread(self, thread_id, label_id, label_name):
         """Add label to a specific thread"""
         service = self.service
         try:
@@ -511,13 +511,14 @@ class GmailLabeler:
         priorityEmailsNotInInbox = "is:unread  after:" + self.date_n_days_ago(14) + f"-({exclude_query})"
         includeQuery = "is:unread  after:" + self.date_n_days_ago(14)
         plabels = ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10"]
-        prioritized_label_id = self.label_id("prioritized", labels)
+        label_name = "prioritized"
+        prioritized_label_id = self.label_id(label_name, labels)
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
             query = includeQuery + f" label:{plabel}"
             thread_ids = self.search_threads_w_exclusion(query, exclude_query, 10000)
             for thread_id in thread_ids:
-                self.add_label_to_thread(thread_id, prioritized_label_id)
+                self.add_label_to_thread(thread_id, prioritized_label_id, label_name)
             print(f"Found {len(thread_ids)} threads, query={query}")
         print("Search for these emails using the query: " + priorityEmailsNotInInbox + " label:prioritized")
 
@@ -836,7 +837,7 @@ class GmailLabeler:
             label_id = self.label_id(p_cat_label, labels)
             print(f"Adding p_cat_label {p_cat_label} to {len(thread_ids)} threads with priority {plabel}")
             for thread_id in thread_ids:
-                self.add_label_to_thread(thread_id, label_id)
+                self.add_label_to_thread(thread_id, label_id, p_cat_label)
         print()
 
         p_cat_labels = ["p_very_high", "p_high", "p_medium", "p_low", "unprioritized", "@ReadyToArchive"]
@@ -905,8 +906,9 @@ class GmailLabeler:
                 label_id = self.label_id(priority, labels)
                 self.add_label_to_thread(thread_id, label_id)
                 if priority == "p9" or priority == "p10":
-                    high_label_id = self.label_id("p_high",labels)
-                    self.add_label_to_thread(thread_id, high_label_id)
+                    label_name = "p_high"
+                    high_label_id = self.label_id(label_name, labels)
+                    self.add_label_to_thread(thread_id, high_label_id, label_name)
 
                 date_string = self.get_thread_max_date_string(thread_details)
                 print(f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, rcvd={date_string} email={email} labels={thread_labels} label_id={label_id}")
