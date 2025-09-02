@@ -478,7 +478,7 @@ class GmailLabeler:
             return []
 
     plabels = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p_unknown", "@ReadyToArchive"]
-    p_cat_labels = ["p_very_high", "p_high", "p_medium", "p_low",  "p_unknown", "@ReadyToArchive"]
+    p_cat_labels = ["p_high", "p_medium", "p_low",  "p_unknown", "@ReadyToArchive"]
 
     def count_by_priority_inbox(self, labels):
         startTime = time.time()
@@ -505,7 +505,7 @@ class GmailLabeler:
 
     def count_by_p_cat_inbox_untimed(self):
         labels = self.get_labels()
-        plabels = ["p_very_high", "p_high", "p_medium", "p_low", "@ReadyForArchive", "p_unknown"]
+        plabels = [ "p_high", "p_medium", "p_low", "@ReadyForArchive", "p_unknown"]
         exclude_queries = []
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
@@ -536,7 +536,7 @@ class GmailLabeler:
         print("Search for these emails using the query: " + priorityEmailsNotInInbox + " label:prioritized")
 
     def unprioritized_threads_inbox(self):
-        unprioritized_inbox_threads_query = "label:inbox -label:@ReadyToArchive -label:p_very_high -label:p_high -label:p_medium -label:p_low -label:p_unknown"
+        unprioritized_inbox_threads_query = "label:inbox -label:@ReadyToArchive -label:p_high -label:p_medium -label:p_low -label:p_unknown"
         excluded_p_cat_queries = self.get_excluded_p_cat_label_queries()
 
         thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_inbox_threads_query, excluded_p_cat_queries, 10000)
@@ -811,18 +811,22 @@ class GmailLabeler:
             return None
 
     def label_emails_by_priority(self, priorities, labels):
-        unprioritized_emails = " -label:@ReadyToArchive -label:p_very_high -label:p_high -label:p_medium -label:p_low -label:p_unknown"
+        unprioritized_emails = " -label:@ReadyToArchive  -label:p_high -label:p_medium -label:p_low -label:p_unknown"
 
         print()
         print("Adding priority labels to inbox...")
+        excluded_queries = self.get_excluded_p_cat_label_queries()
         unprioritized_emails_inbox = "label:inbox" + unprioritized_emails
-        self.add_priority_labels_exclude_prioritized_emails(labels, priorities, unprioritized_emails_inbox)
+        self.add_priority_labels_exclude_prioritized_emails(labels, priorities, unprioritized_emails_inbox, excluded_queries)
         print()
 
         print("Adding priority labels to unread in last 3d...")
         date3DaysAgo = self.date_n_days_ago(3.0)
-        unprioritized_emails_unread_3d = f"is:unread after:{date3DaysAgo}" + unprioritized_emails
-        self.add_priority_labels_exclude_prioritized_emails(labels, priorities, unprioritized_emails_unread_3d)
+
+        excluded_queries.append("label:inbox")
+        unprioritized_emails_unread_3d = f"is:unread after:{date3DaysAgo}" + unprioritized_emails + " label:inbox"
+        self.add_priority_labels_exclude_prioritized_emails(labels, priorities,
+                                                            unprioritized_emails_unread_3d, excluded_queries)
         print()
 
     def label_emails_by_priority_category(self, labels):
@@ -845,7 +849,7 @@ class GmailLabeler:
                 self.add_label_to_thread(thread_id, label_id, p_cat_label)
         print()
 
-        p_cat_labels = ["p_very_high", "p_high", "p_medium", "p_low", "unprioritized", "@ReadyToArchive"]
+        p_cat_labels = ["p_high", "p_medium", "p_low", "unprioritized", "@ReadyToArchive"]
         for label in p_cat_labels:
             query = "label:inbox label:" + label
             thread_ids = self.search_threads(query, 1000)
@@ -853,11 +857,9 @@ class GmailLabeler:
         print("")
 
     def map_label_to_p_cat_label(self, plabel):
-        if plabel == "p10" or plabel == "p9":
-            p_cat_label = "p_very_high"
-        elif plabel == "p8" or plabel == "p7" or plabel == 'p5':
+        if plabel == "p10" or plabel == "p9" :
             p_cat_label = "p_high"
-        elif plabel == "p6" or plabel == "p2":
+        elif plabel == "p6" or plabel == "p2" or plabel == "p8" or plabel == "p7" or plabel == 'p5':
             p_cat_label = "p_medium"
         else:
             p_cat_label = "p_low"
@@ -898,9 +900,8 @@ class GmailLabeler:
             print("sheetsURL: " + sheets_url)
             print()
 
-    def add_priority_labels_exclude_prioritized_emails(self, labels, priorities, unprioritized_emails):
+    def add_priority_labels_exclude_prioritized_emails(self, labels, priorities, unprioritized_emails, excluded_queries):
         # Search for emails
-        excluded_queries = self.get_excluded_p_cat_label_queries()
         thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_emails, excluded_queries, 10000)
         # thread_ids = self.search_threads(unprioritized_emails, 10000)
         totalThreads = len(thread_ids)
@@ -952,7 +953,7 @@ def remove_p_category_from_archived_emails():
     labels = labeler.get_labels()
 
     print("Removing p_cat_labels from archived emails")
-    p_cat_labels = ['p_very_high', 'p_high', 'p_medium', 'p_low']
+    p_cat_labels = ['p_high', 'p_medium', 'p_low']
     for p_cat_label in p_cat_labels:
         query = f"label:{p_cat_label} -label:inbox"
         thread_ids = labeler.search_threads(query, 1000)
@@ -1063,6 +1064,7 @@ def daily_email_routine():
     label_prioritized_emails_not_in_inbox()
     label_emails_w_p_category()
     count_by_priority_inbox()
+    append_unknown_senders()
     timeElapsed = time.time() - startTime
     print(f"Time elapesed {timeElapsed} seconds")
     return True
