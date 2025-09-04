@@ -426,7 +426,7 @@ class GmailLabeler:
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
             thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
-            print(f"Found {len(thread_ids)} threads with label.name={plabel}")
+            print(f"remove_priority_labels: Found {len(thread_ids)} threads with label.name={plabel}")
             threads = 0
             totalThreads = len(thread_ids)
             for thread_id in thread_ids:
@@ -484,7 +484,7 @@ class GmailLabeler:
         startTime = time.time()
         self.count_by_priority_inbox_untimed(labels)
         timeElapsed = int(time.time() - startTime)
-        print(f"Time elapesed {timeElapsed} seconds")
+        print(f"Time elapsed {timeElapsed} seconds")
 
     def count_by_priority_inbox_untimed(self, labels):
         plabels = self.p_cat_labels
@@ -492,7 +492,7 @@ class GmailLabeler:
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
             thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
-            print(f"Found {len(thread_ids)} threads with label.name={plabel}")
+            print(f"count_by_priority_inbox: Found {len(thread_ids)} threads with label.name={plabel}")
             total_prioritized_thread_count += len(thread_ids)
 
         thread_ids = self.search_threads("label:inbox", 10000)
@@ -500,23 +500,21 @@ class GmailLabeler:
         print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}")
 
         unprioritized_threads = self.unprioritized_threads_inbox()
-        unprioritized_thread_count = len(unprioritized_threads)
-        print(f"unprioritized_thread_count={unprioritized_thread_count}")
 
-    def count_by_p_cat_inbox_untimed(self):
-        labels = self.get_labels()
-        plabels = [ "p_high", "p_medium", "p_low", "@ReadyForArchive", "p_unknown"]
-        exclude_queries = []
-        for plabel in plabels:
-            label_id = self.label_id(plabel, labels)
-            thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
-            print(f"Found {len(thread_ids)} threads with label.name={plabel}")
-            exclude_queries.append(f"label:{plabel}")
-
-        otherThreads = self.search_threads_w_multiple_exclusions("label:inbox", exclude_queries, 10000)
-        print(f"Other threads in inbox: {len(otherThreads)}")
-
-        # self.label_prioritized_emails_not_in_inbox(labels)
+    # def count_by_p_cat_inbox_untimed(self):
+    #     labels = self.get_labels()
+    #     plabels = [ "p_high", "p_medium", "p_low", "@ReadyForArchive", "p_unknown"]
+    #     exclude_queries = []
+    #     for plabel in plabels:
+    #         label_id = self.label_id(plabel, labels)
+    #         thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
+    #         print(f"count_by_p_cat_inbox: Found {len(thread_ids)} threads with label.name={plabel}")
+    #         exclude_queries.append(f"label:{plabel}")
+    #
+    #     otherThreads = self.search_threads_w_multiple_exclusions("label:inbox", exclude_queries, 10000)
+    #     print(f"Other threads in inbox: {len(otherThreads)}")
+    #
+    #     # self.label_prioritized_emails_not_in_inbox(labels)
 
     def label_prioritized_emails_not_in_inbox(self):
         labels = self.get_labels()
@@ -535,24 +533,28 @@ class GmailLabeler:
             print(f"Found {len(thread_ids)} threads, query={query}")
         print("Search for these emails using the query: " + priorityEmailsNotInInbox + " label:prioritized")
 
-    def unprioritized_threads_inbox(self):
+    def unprioritized_threads_inbox(self, labelUnprioritizedThreads=False):
         unprioritized_inbox_threads_query = "label:inbox -label:@ReadyToArchive -label:p_high -label:p_medium -label:p_low -label:p_unknown"
         excluded_p_cat_queries = self.get_excluded_p_cat_label_queries()
 
         thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_inbox_threads_query, excluded_p_cat_queries, 10000)
+        print()
         print("Running search for unprioritized emails in inbox")
         print(f"query={unprioritized_inbox_threads_query}")
-        print(f"search threads returned {len(thread_ids)} threads..checking their messages for plabels")
-        unprioritized_threads = []
-        unprioritized_label_id = self.label_id("unprioritized", self.get_labels())
-        for thread_id in thread_ids:
-            print(".", end="", flush=True)
-            if not self.is_thread_prioritized(thread_id):
-                unprioritized_threads.append(thread_id)
-                self.add_label_to_thread(thread_id, unprioritized_label_id, "unprioritized")
-        print()
-        print("You can look for these emails with query: label:inbox label:unprioritized")
-        return unprioritized_threads
+        print(f"search threads returned {len(thread_ids)} threads")
+        if labelUnprioritizedThreads:
+            print(f"Labeling unprioritized threads...")
+            unprioritized_threads = []
+            unprioritized_label_id = self.label_id("unprioritized", self.get_labels())
+            for thread_id in thread_ids:
+                print(".", end="", flush=True)
+                if not self.is_thread_prioritized(thread_id):
+                    unprioritized_threads.append(thread_id)
+                    self.add_label_to_thread(thread_id, unprioritized_label_id, "unprioritized")
+            print()
+            unprioritized_thread_count = len(unprioritized_threads)
+            print(f"unprioritized_thread_count={unprioritized_thread_count}")
+            print("You can look for these emails with query: label:inbox label:unprioritized")
 
     def get_excluded_p_cat_label_queries(self):
         excluded_queries = []
@@ -940,7 +942,7 @@ def continuously_remove_p_category_from_archived_emails():
         try:
             startTime = time.time()
             remove_p_category_from_archived_emails()
-            labeler.count_by_p_cat_inbox_untimed()
+            labeler.count_by_priority_inbox_untimed()
             timeElapsed = int(time.time() - startTime)
             print(f"Time elapesed {timeElapsed} seconds")
         except:
@@ -1039,7 +1041,6 @@ def count_by_priority_inbox():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
     labeler.count_by_priority_inbox(labels)
-    labeler.count_by_p_cat_inbox_untimed()
     return True
 
 def option_3():
