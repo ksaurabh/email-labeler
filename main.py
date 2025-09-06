@@ -154,7 +154,7 @@ class GmailLabeler:
             print(f"An error occurred - move_thread_to_inbox: {error}")
             return False
 
-    def remove_label_from_thread(self, thread_id: str, label_id, label_name,
+    def remove_label_from_thread(self, thread_id: str, label_id, label_name, verbose=True,
                                  user_id: str = 'me') -> bool:
         """
         Remove specified labels from all messages in a Gmail thread.
@@ -177,7 +177,8 @@ class GmailLabeler:
                 body={'removeLabelIds': label_id}
             ).execute()
 
-            print(f"Successfully removed label name={label_name}, id={label_id} from thread {thread_id}")
+            if verbose:
+                print(f"Successfully removed label name={label_name}, id={label_id} from thread {thread_id}")
             return True
 
         except HttpError as error:
@@ -258,7 +259,7 @@ class GmailLabeler:
             print(f"An error occurred while getting email details: {error}")
             return None
 
-    def add_label_to_thread(self, thread_id, label_id, label_name):
+    def add_label_to_thread(self, thread_id, label_id, label_name, verbose=True):
         """Add label to a specific thread"""
         service = self.service
         try:
@@ -277,10 +278,11 @@ class GmailLabeler:
             result = service.users().messages().batchModify(
                 userId='me', body=body).execute()
 
-            if label_name is None:
-                print(f"Successfully added label to thread with {len(message_ids)} messages")
-            else:
-                print(f"Successfully added label {label_name} to thread with {len(message_ids)} messages")
+            if verbose:
+                if label_name is None:
+                    print(f"Successfully added label to thread with {len(message_ids)} messages")
+                else:
+                    print(f"Successfully added label {label_name} to thread with {len(message_ids)} messages")
 
             return True
 
@@ -977,10 +979,10 @@ def remove_p_category_from_archived_emails():
                     break
             # print(f"thread_id: {thread_id} isArchived:{isArchived}")
             if isArchived:
-                print()
-                print(f"{sender} \t {subject} ")
-                print(thread_labels)
-                print(f"Removing label {p_cat_label}")
+                # print()
+                # print(f"{sender} \t {subject} ")
+                # print(thread_labels)
+                # print(f"Removing label {p_cat_label}")
 
                 label_id = labeler.label_id(p_cat_label, labels)
                 labeler.remove_label_from_thread(thread_id, label_id, p_cat_label)
@@ -1058,6 +1060,24 @@ def timedMethod(method):
     method()
     timeElapsed = int(time.time() - startTime)
     print(f"Time elapesed {timeElapsed} seconds")
+
+def move_low_priority_out_of_inbox():
+    labeler = GmailLabeler()
+    labels = labeler.get_labels()
+    low_p_cat_labels = ['p_low', 'p_unknown', '@ReadyToArchive']
+    inboxOverFlowLabel = '@InboxOverflow'
+    inboxOverFlowLabelId = labeler.label_id(inboxOverFlowLabel, labels)
+    inboxLabel = 'INBOX'
+    inboxLabelId = labeler.label_id(inboxLabel, labels)
+    for label in low_p_cat_labels:
+        label_id = labeler.label_id(label, labels)
+        thread_ids = labeler.search_threads(f"label:inbox label:{label}", 1000)
+        print(f"Moving {len(thread_ids)} threads matching label:{label} from inbox to inboxOverflow")
+        for thread_id in thread_ids:
+            labeler.add_label_to_thread(thread_id, inboxOverFlowLabelId, inboxOverFlowLabel, False)
+            labeler.remove_label_from_thread(thread_id, inboxLabelId, inboxLabel, False)
+            print(".", end='', flush=True)
+        print()
 
 def daily_email_routine():
     startTime = time.time()
@@ -1138,8 +1158,8 @@ def main():
     # options_edit_them_here
     options = {
         '1': ('Inbox: Count by Priority', count_by_priority_inbox),
-        '2': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox ),
-        '3': ('Label Emails', label_emails),
+        '2': ('Label Emails', label_emails),
+        '3': ('Move p_low, p_unknown and @ReadyToArchive out of inbox', move_low_priority_out_of_inbox),
         '4': ('Show Threads stats', option_3),
         '5': ('Show SaneLater stats', option_4),
         '6': ('Append unknown senders', append_unknown_senders),
@@ -1149,10 +1169,11 @@ def main():
         '10': ('Remove p_cat_labels from archived emails ', remove_p_category_from_archived_emails),
         '11': ('Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
         '12': ('Daily Email Routine', daily_email_routine),
+        '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox ),
 
         # if i reply to an email label it p4 at least.
 
-        '13': ('Exit', goodbye)
+        '14': ('Exit', goodbye)
     }
 
     while True:
