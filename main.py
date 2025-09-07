@@ -958,10 +958,10 @@ def remove_p_category_from_archived_emails():
     labels = labeler.get_labels()
 
     print("Removing p_cat_labels from archived emails")
-    p_cat_labels = ['p_high', 'p_medium', 'p_low']
+    p_cat_labels = ['p_high', 'p_medium']
     for p_cat_label in p_cat_labels:
         query = f"label:{p_cat_label} -label:inbox"
-        thread_ids = labeler.search_threads(query, 1000)
+        thread_ids = labeler.search_threads_w_exclusion(query, "label:inbox", 1000)
         print(f"Found {len(thread_ids)} for query: " + query)
         for thread_id in thread_ids:
             thread_details = labeler.get_thread_details(thread_id)
@@ -1162,7 +1162,7 @@ def main():
     args = parser.parse_args()
     print(f"args: {args}")
     print()
-    
+
     if args.background:
         run_in_bg()
     else:
@@ -1175,10 +1175,23 @@ def main():
 
 def run_in_bg():
     while True:
+        startTime = time.time()
         count_by_priority_inbox()
         label_emails()
         move_low_priority_out_of_inbox()
+        remove_p_category_from_archived_emails()
+
+        timeElapsed = int(time.time() - startTime)
+        print(f"Time elapesed {timeElapsed} seconds")
         print()
+        if timeElapsed < 60:
+            sleepSeconds = 60 - timeElapsed
+            print(f"sleeping for {sleepSeconds} seconds...")
+            for i in range(0, sleepSeconds):
+                time.sleep(1)
+                if i % 10 == 0:
+                    print(i, end='', flush=True)
+                print(".", end='', flush=True)
         print()
 
 def run_interactively():
@@ -1194,8 +1207,7 @@ def run_interactively():
         '8': ('Prioritize last14d emails from unknown senders', prioritize_last14d_emails_unknown_senders),
         '9': ('Add priority category labels (assumes threads already have priority labels)', label_emails_w_p_category),
         '10': ('Remove p_cat_labels from archived emails ', remove_p_category_from_archived_emails),
-        '11': (
-        'Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
+        '11': ('Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
         '12': ('Daily Email Routine', daily_email_routine),
         '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox),
 
