@@ -2,6 +2,7 @@ import os
 import pickle
 import re
 import time
+import argparse
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -1155,6 +1156,32 @@ def goodbye():
     return False
 
 def main():
+    parser = argparse.ArgumentParser(description='Email Labeler')
+    parser.add_argument('--background', '-b', action='store_true', help='run this in the background')
+
+    args = parser.parse_args()
+    print(f"args: {args}")
+    print()
+    
+    if args.background:
+        run_in_bg()
+    else:
+        run_interactively()
+
+    """Example usage of the Gmail labeler."""
+    # Initialize the labeler
+
+    # labeler.remove_priority_labels(labels)
+
+def run_in_bg():
+    while True:
+        count_by_priority_inbox()
+        label_emails()
+        move_low_priority_out_of_inbox()
+        print()
+        print()
+
+def run_interactively():
     # options_edit_them_here
     options = {
         '1': ('Inbox: Count by Priority', count_by_priority_inbox),
@@ -1167,15 +1194,15 @@ def main():
         '8': ('Prioritize last14d emails from unknown senders', prioritize_last14d_emails_unknown_senders),
         '9': ('Add priority category labels (assumes threads already have priority labels)', label_emails_w_p_category),
         '10': ('Remove p_cat_labels from archived emails ', remove_p_category_from_archived_emails),
-        '11': ('Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
+        '11': (
+        'Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
         '12': ('Daily Email Routine', daily_email_routine),
-        '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox ),
+        '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox),
 
         # if i reply to an email label it p4 at least.
 
         '14': ('Exit', goodbye)
     }
-
     while True:
         print("\n--- Menu ---")
         for key, (description, _) in options.items():
@@ -1189,11 +1216,6 @@ def main():
                 break
         else:
             print("Invalid choice. Please try again.")
-
-    """Example usage of the Gmail labeler."""
-    # Initialize the labeler
-
-    # labeler.remove_priority_labels(labels)
 
 
 if __name__ == '__main__':
