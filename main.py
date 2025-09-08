@@ -429,7 +429,7 @@ class GmailLabeler:
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
             thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
-            print(f"remove_priority_labels: Found {len(thread_ids)} threads with label.name={plabel}")
+            print(f"remove_priority_labels: Found {len(thread_ids)} threads with label.name={plabel}", flush=True)
             threads = 0
             totalThreads = len(thread_ids)
             for thread_id in thread_ids:
@@ -487,7 +487,7 @@ class GmailLabeler:
         startTime = time.time()
         self.count_by_priority_inbox_untimed(labels)
         timeElapsed = int(time.time() - startTime)
-        print(f"Time elapsed {timeElapsed} seconds")
+        print(f"Time elapsed {timeElapsed} seconds", flush=True)
 
     def count_by_priority_inbox_untimed(self, labels):
         plabels = self.p_cat_labels
@@ -495,12 +495,12 @@ class GmailLabeler:
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
             thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
-            print(f"count_by_priority_inbox: Found {len(thread_ids)} threads with label.name={plabel}")
+            print(f"count_by_priority_inbox: Found {len(thread_ids)} threads with label.name={plabel}", flush=True)
             total_prioritized_thread_count += len(thread_ids)
 
         thread_ids = self.search_threads("label:inbox", 10000)
         total_threads = len(thread_ids)
-        print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}")
+        print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}", flush=True)
 
         unprioritized_threads = self.unprioritized_threads_inbox()
 
@@ -846,10 +846,10 @@ class GmailLabeler:
             query = "label:inbox label:" + plabel + " -label:" + p_cat_label
             print()
             thread_ids = self.search_threads(query, max_results=100)
-            print(f"Found {len(thread_ids)} threads matching query: " + query)
+            print(f"Found {len(thread_ids)} threads matching query: " + query, flush=True)
 
             label_id = self.label_id(p_cat_label, labels)
-            print(f"Adding p_cat_label {p_cat_label} to {len(thread_ids)} threads with priority {plabel}")
+            print(f"Adding p_cat_label {p_cat_label} to {len(thread_ids)} threads with priority {plabel}", flush=True)
             for thread_id in thread_ids:
                 self.add_label_to_thread(thread_id, label_id, p_cat_label)
         print()
@@ -859,7 +859,7 @@ class GmailLabeler:
             query = "label:inbox label:" + label
             thread_ids = self.search_threads(query, 1000)
             print(f"{len(thread_ids)} threads for query: {query}")
-        print("")
+        print("", flush=True)
 
     def map_label_to_p_cat_label(self, plabel):
         if plabel == "p10" or plabel == "p9" :
@@ -1073,12 +1073,12 @@ def move_low_priority_out_of_inbox():
     for label in low_p_cat_labels:
         label_id = labeler.label_id(label, labels)
         thread_ids = labeler.search_threads(f"label:inbox label:{label}", 1000)
-        print(f"Moving {len(thread_ids)} threads matching label:{label} from inbox to inboxOverflow")
+        print(f"Moving {len(thread_ids)} threads matching label:{label} from inbox to inboxOverflow", flush=True)
         for thread_id in thread_ids:
             labeler.add_label_to_thread(thread_id, inboxOverFlowLabelId, inboxOverFlowLabel, False)
             labeler.remove_label_from_thread(thread_id, inboxLabelId, inboxLabel, False)
             print(".", end='', flush=True)
-        print()
+        print("",  flush=True)
 
 def daily_email_routine():
     startTime = time.time()
