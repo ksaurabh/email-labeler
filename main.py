@@ -487,7 +487,9 @@ class GmailLabeler:
         startTime = time.time()
         self.count_by_priority_inbox_untimed(labels)
         timeElapsed = int(time.time() - startTime)
-        print(f"Time elapsed {timeElapsed} seconds", flush=True)
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{now_str}: Time elapsed {timeElapsed} seconds", flush=True)
+        print()
 
     def count_by_priority_inbox_untimed(self, labels):
         plabels = self.p_cat_labels
@@ -947,7 +949,9 @@ def continuously_remove_p_category_from_archived_emails():
             remove_p_category_from_archived_emails()
             labeler.count_by_priority_inbox_untimed()
             timeElapsed = int(time.time() - startTime)
-            print(f"Time elapesed {timeElapsed} seconds")
+            now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"{now_str}: Time elapssed {timeElapsed} seconds")
+            print()
         except:
             pass
         print("sleeping for 3 seconds")
@@ -1060,7 +1064,9 @@ def timedMethod(method):
     startTime = time.time()
     method()
     timeElapsed = int(time.time() - startTime)
-    print(f"Time elapesed {timeElapsed} seconds")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{now_str}: Time elapsed {timeElapsed} seconds")
+    print()
 
 def move_low_priority_out_of_inbox():
     labeler = GmailLabeler()
@@ -1088,7 +1094,8 @@ def daily_email_routine():
     count_by_priority_inbox()
     append_unknown_senders()
     timeElapsed = time.time() - startTime
-    print(f"Time elapesed {timeElapsed} seconds")
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{now_str}: Time elapsed {timeElapsed} seconds")
     return True
 
 sheetsUtil = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
@@ -1176,13 +1183,14 @@ def main():
 def run_in_bg():
     while True:
         startTime = time.time()
-        count_by_priority_inbox()
         label_emails()
         move_low_priority_out_of_inbox()
         remove_p_category_from_archived_emails()
+        count_by_priority_inbox()
 
         timeElapsed = int(time.time() - startTime)
-        print(f"Time elapesed {timeElapsed} seconds")
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{now_str}: Time elapsed {timeElapsed} seconds")
         print()
         if timeElapsed < 60:
             sleepSeconds = 60 - timeElapsed
