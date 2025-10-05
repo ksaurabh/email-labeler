@@ -957,6 +957,22 @@ class GmailLabeler:
                         f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, rcvd={date_string} email={email} labels={thread_labels} label_id={label_id}")
                     print("")
 
+        # marked unread high /medium priority emails with unread_high_medium
+        self.label_unread(labels, "p_medium")
+        self.label_unread(labels, "p_high")
+        print("Done marking unread_high_medium")
+        print()
+
+
+    def label_unread(self, labels, priority_label):
+        query = f"is:unread label:inbox label:{priority_label} -label:unread_high_medium"
+        excluded_query = "label:unread_high_medium label:inbox"
+        thread_ids = self.search_threads_w_exclusion(query, excluded_query, 1000)
+        for thread_id in thread_ids:
+            label = "unread_high_medium"
+            label_id = self.label_id(label, labels)
+            self.add_label_to_thread(thread_id, label_id, label)
+
 
 def label_emails_w_p_category():
     labeler = GmailLabeler()
