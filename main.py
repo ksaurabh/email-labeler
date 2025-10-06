@@ -984,7 +984,7 @@ def continuously_remove_p_category_from_archived_emails():
     while True:
         try:
             startTime = time.time()
-            remove_p_category_from_archived_emails()
+            remove_stale_p_labels()
             labeler.count_by_priority_inbox_untimed()
             timeElapsed = int(time.time() - startTime)
             now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -995,9 +995,23 @@ def continuously_remove_p_category_from_archived_emails():
         print("sleeping for 3 seconds")
         time.sleep(3)
 
-def remove_p_category_from_archived_emails():
+def remove_unread_high_medium():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
+
+def remove_stale_p_labels():
+    labeler = GmailLabeler()
+    labels = labeler.get_labels()
+    unread_label = "unread_high_medium"
+    unread_label_id = labeler.label_id(unread_label, labels)
+
+    query = f"label:unread_high_medium is:read"
+    thread_ids = labeler.search_threads_w_exclusion(query, "label:inbox", 1000)
+    print(f"Found {len(thread_ids)} for query: " + query)
+    for thread_id in thread_ids:
+        labeler.remove_label_from_thread(thread_id, unread_label_id, unread_label)
+    print(f"Done removing {unread_label} from these threads")
+    print()
 
     print("Removing p_cat_labels from archived emails")
     p_cat_labels = ['p_high', 'p_medium']
@@ -1289,7 +1303,7 @@ def run_in_bg():
         startTime = time.time()
         label_emails()
         move_low_priority_out_of_inbox()
-        remove_p_category_from_archived_emails()
+        remove_stale_p_labels()
         count_by_priority_inbox()
 
         timeElapsed = int(time.time() - startTime)
@@ -1318,7 +1332,7 @@ def run_interactively():
         '7': ('Calcualte domain priority', calculate_domain_priority),
         '8': ('Prioritize last14d emails from unknown senders', prioritize_last14d_emails_unknown_senders),
         '9': ('Add priority category labels (assumes threads already have priority labels)', label_emails_w_p_category),
-        '10': ('Remove p_cat_labels from archived emails ', remove_p_category_from_archived_emails),
+        '10': ('Remove stale priority labels: p_cat_labels from archived emails, unread_high_medium from read ', remove_stale_p_labels),
         '11': ('Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
         '12': ('Daily Email Routine', daily_email_routine),
         '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox),
