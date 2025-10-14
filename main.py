@@ -1014,7 +1014,7 @@ class GmailLabeler:
                 self.add_label_to_thread(thread_id, label_id, p_cat_label)
         print()
 
-        p_cat_labels = ["p_high", "p_medium", "p_low", "unprioritized", "@ReadyToArchive"]
+        p_cat_labels = ["p_high", "p_low", "unprioritized", "@ReadyToArchive"]
         for label in p_cat_labels:
             query = "label:inbox label:" + label
             thread_ids = self.search_threads(query, 1000)
@@ -1023,10 +1023,8 @@ class GmailLabeler:
 
 
     def map_label_to_p_cat_label(self, plabel):
-        if plabel == "p10" or plabel == "p9":
+        if plabel == "p10" or plabel == "p9" or plabel == "p6" or plabel == "p2" or plabel == "p8" or plabel == "p7" or plabel == 'p5':
             p_cat_label = "p_high"
-        elif plabel == "p6" or plabel == "p2" or plabel == "p8" or plabel == "p7" or plabel == 'p5':
-            p_cat_label = "p_medium"
         else:
             p_cat_label = "p_low"
         return p_cat_label
