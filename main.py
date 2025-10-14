@@ -12,6 +12,7 @@ from googleapiclient.errors import HttpError
 from collections import Counter
 import GoogleDriveCSVDownloader
 import GoogleSpreadsheetUtil
+import CounterByKey
 from email.utils import parseaddr
 from datetime import datetime, timedelta
 import csv
@@ -20,11 +21,14 @@ from email.utils import formatdate
 
 from email.utils import parseaddr
 
+
 def get_domain(email_str):
     return parseaddr(email_str)[1].split('@')[1] if '@' in parseaddr(email_str)[1] else None
 
+
 # Usage
 domain = get_domain("Kumar Saurabh <kumar@airmdr.com>")
+
 
 def csv_to_dict_list(file_path):
     """Convert CSV to list of dictionaries (each row is a dict)."""
@@ -37,10 +41,12 @@ def csv_to_dict_list(file_path):
             result.append(dict(row))
 
     return result
+
+
 def append_sender_priorities(result, df):
     for row in df.values:
         # print(row)
-        result.append({'from': row[0], 'priority':row[1]})
+        result.append({'from': row[0], 'priority': row[1]})
 
 
 # Gmail API scope for reading and modifying emails
@@ -384,7 +390,7 @@ class GmailLabeler:
                 return f"p{p['priority']}"
         return "p_unknown"
 
-    def mark_thread_as_read(self, thread_id: str, user_id: str = 'me') -> bool:
+    def mark_thread_as_read(self, thread_id: str, verbose=True, user_id: str = 'me') -> bool:
         """
         Mark a Gmail thread as read by removing the UNREAD label.
 
@@ -405,7 +411,8 @@ class GmailLabeler:
                 body={'removeLabelIds': ['UNREAD']}
             ).execute()
 
-            print(f"Successfully marked thread {thread_id} as read")
+            if verbose:
+                print(f"Successfully marked thread {thread_id} as read")
             return True
 
         except HttpError as error:
@@ -481,7 +488,7 @@ class GmailLabeler:
             return []
 
     plabels = ["p0", "p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p_unknown", "@ReadyToArchive"]
-    p_cat_labels = ["p_high", "p_medium", "p_low",  "p_unknown", "@ReadyToArchive"]
+    p_cat_labels = ["p_high", "p_medium", "p_low", "p_unknown", "@ReadyToArchive"]
 
     def count_by_priority_inbox(self, labels):
         startTime = time.time()
@@ -502,7 +509,8 @@ class GmailLabeler:
 
         thread_ids = self.search_threads("label:inbox", 10000)
         total_threads = len(thread_ids)
-        print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}", flush=True)
+        print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}",
+              flush=True)
 
         unprioritized_threads = self.unprioritized_threads_inbox()
 
@@ -542,7 +550,8 @@ class GmailLabeler:
         unprioritized_inbox_threads_query = "label:inbox -label:@ReadyToArchive -label:p_high -label:p_medium -label:p_low -label:p_unknown"
         excluded_p_cat_queries = self.get_excluded_p_cat_label_queries()
 
-        thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_inbox_threads_query, excluded_p_cat_queries, 10000)
+        thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_inbox_threads_query,
+                                                               excluded_p_cat_queries, 10000)
         print()
         print("Running search for unprioritized emails in inbox")
         print(f"query={unprioritized_inbox_threads_query}")
@@ -612,7 +621,6 @@ class GmailLabeler:
         labels = labeler.get_labels()
         sanelaterLabelId = labeler.label_id("@SaneLater", labels)
 
-
         for id in thread_ids:
 
             details = self.get_thread_details(id)
@@ -630,7 +638,7 @@ class GmailLabeler:
             if choice == "1":
                 print(f"Domain {domain} is safe, removing sanelater label and moving to inbox")
                 labeler.move_thread_to_inbox(id)
-                labeler.remove_label_from_thread(id,sanelaterLabelId, "@SaneLater" )
+                labeler.remove_label_from_thread(id, sanelaterLabelId, "@SaneLater")
             if choice == "":
                 print("Marking this thread as read..")
                 labeler.mark_thread_as_read(id)
@@ -652,9 +660,32 @@ class GmailLabeler:
     def get_thread_sender(self, details):
         fromAddr = details['messages'][0]['From']
         return fromAddr
+
+    def get_all_recipients(self, details):
+        messages = details['messages']
+        receipients = set()
+        for message in messages:
+            cc = message['Cc']
+            peopleOnCC = cc.split(",")
+            for p in peopleOnCC:
+                name, email = parseaddr(p)
+                if email != '' and email.__contains__("@"):
+                    receipients.add(email)
+            to = message['To']
+
+            people = to.split(",")
+            for p in people:
+                name, email = parseaddr(p)
+                if email != '' and email.__contains__("@"):
+                    receipients.add(email)
+
+        return receipients
+
+
     def get_thread_max_date_string(self, details):
         max_date_string = details['max_date_string']
         return max_date_string
+
 
     def search_threads_w_exclusion(self, include_query, exclude_query, max_results=10):
         included_ids = self.search_threads(include_query, max_results)
@@ -665,6 +696,7 @@ class GmailLabeler:
             if not excluded_ids.__contains__(id):
                 result.append(id)
         return result
+
 
     def search_threads_w_multiple_exclusions(self, include_query, exclude_queries, max_results=10):
         included_ids = self.search_threads(include_query, max_results)
@@ -679,6 +711,7 @@ class GmailLabeler:
             if not excluded_ids.__contains__(id):
                 result.append(id)
         return result
+
 
     def search_threads(self, query, max_results=10):
         """
@@ -704,6 +737,7 @@ class GmailLabeler:
         except HttpError as error:
             print(f'An error occurred - search_threads: {error}')
             return []
+
 
     def format_datetime_tuple(self, dt_tuple, format_string="%Y-%m-%d %H:%M:%S"):
         """
@@ -732,6 +766,7 @@ class GmailLabeler:
 
         except (TypeError, ValueError) as e:
             return f"Error formatting tuple: {e}"
+
 
     def get_thread_details(self, thread_id):
         """
@@ -776,17 +811,23 @@ class GmailLabeler:
             print(f'An error occurred - get_thread_details: {error}')
             return None
 
+
     def parse_message(self, message):
         headers = message['payload']['headers']
         fromAddr = ""
-        subject  = ""
+        subject = ""
+        cc = ""
+        to = ""
         for header in headers:
+            if header['name'] == "Cc":
+                cc = header["value"]
             if header['name'] == "From":
                 fromAddr = header["value"]
             if header['name'] == "Subject":
                 subject = header["value"]
-        return {"Subject": subject, "From":fromAddr}
-
+            if header['name'] == "To":
+                to = header["value"]
+        return {"Subject": subject, "From": fromAddr, "Cc": cc, "To": to}
 
 
     def get_thread_id_from_message_id(self, message_id):
@@ -817,6 +858,119 @@ class GmailLabeler:
             print(f"An error occurred - get_thread_id_from_message_id: {error}")
             return None
 
+
+    def analyze_sent_emails(self):
+        threads = self.search_threads("label:sent", 1000)
+        unique_recipients = set()
+        for thread in threads:
+            thread_details = self.get_thread_details(thread)
+            for r in self.get_all_recipients(thread_details):
+                if not unique_recipients.__contains__(r):
+                    print()
+                    print(r, end="", flush=True)
+                    unique_recipients.add(r)
+                else:
+                    print(" .", end="", flush=True)
+
+
+    def analyze_inbox_overflow_read(self):
+        print()
+        days = int(input("how many days do you want to scan:"))
+        total_unread = 0
+        domainCounter = CounterByKey.CounterByKey()
+        for i in range(1, days):
+            start = self.date_n_days_ago(i)
+            end = self.date_n_days_ago(i - 1)
+            query = f"label:@inboxoverflow is:unread before:{end} after:{start}"
+            threads = self.search_threads(query, 1000)
+            print(f"Found {len(threads)} unread threads, query: {query}")
+            total_unread += len(threads)
+            for thread in threads:
+                print(".", end='', flush=True)
+                details = self.get_thread_details(thread)
+                sender = self.get_thread_sender(details)
+                domain = get_domain(sender)
+                domainCounter.add(domain)
+            print()
+        domainCounter.print_by_count()
+
+    def analyze_inbox_overflow_unread(self):
+        print()
+        days = int(input("how many days do you want to scan:"))
+        total_unread=0
+        for i in range(1, days):
+            start = self.date_n_days_ago(i)
+            end = self.date_n_days_ago(i-1)
+            query = f"label:@inboxoverflow is:unread before:{end} after:{start}"
+            threads = self.search_threads(query, 1000)
+            print(f"Found {len(threads)} unread threads, query: {query}")
+            total_unread += len(threads)
+        end = self.date_n_days_ago(days)
+        query = f"label:@inboxoverflow is:unread before:{end}"
+        threads = self.search_threads(query, 1000)
+        total_unread += len(threads)
+        print(f"Found {len(threads)} unread threads, query: {query}")
+        print(f"Total unread: {total_unread}")
+        print()
+
+        query = f"label:@inboxoverflow is:unread label:@ReadyToArchive after:{end}"
+        threads = self.search_threads(query, 1000)
+        print(f"Found {len(threads)} threads, query: {query}")
+        labels = self.get_labels()
+        ignore_name = "ignore"
+        ignore_id = self.label_id(ignore_name, labels)
+        left_unread = set()
+        for thread in threads:
+            details = self.get_thread_details(thread)
+            subject = self.get_thread_subject(details)
+            sender = self.get_thread_sender(details)
+            recipients = self.get_all_recipients(details)
+            message_count = details['message_count']
+
+            ignore = False
+            if len(recipients) == 1 and recipients.__contains__("mdr-ops@airmdr.com"):
+                ignore = True
+            if len(recipients) == 1 and recipients.__contains__("kumar@airmdr.com") and str(sender).__contains__("no-reply@zoom.us"):
+                ignore = True
+            if len(recipients) == 2 and recipients.__contains__("mdr-ops@airmdr.com") and recipients.__contains__("anthony@airmdr.com"):
+                ignore = True
+
+            ignore_sender_subjects = [
+                ("data-science@airmdr.com", "Your OpenAI API account has been funded"),
+                ("suyash@airmdr.com", "AWS Cost Report for AWS & GCP - Last 1d")
+            ]
+
+            for p in ignore_sender_subjects:
+                sender1, subject1 = p
+                if self.ignore_sender_subject(sender1, subject1, sender, subject):
+                    ignore = True
+
+            if recipients.__contains__("Receipts@airmdr.com") and not recipients.__contains__("kumar@airmdr.com"):
+                ignore = True
+            if message_count == 1 and (
+                    str(subject).startswith("Accepted")
+                    or str(subject).__contains__("card has been charged")
+                    or str(subject).__contains__("High Priority Bugs Open for too long")
+                    or str(subject).__contains__("Execution failure alert")
+            ):
+                ignore = True
+
+            if ignore:
+                print("Marking as read - from:" + sender + " subject:" + subject)
+                self.mark_thread_as_read(thread, False)
+            else:
+                left_unread.add((sender, subject))
+
+        print("Lead unread:")
+        for x in left_unread:
+            sender, subject = x
+            print(f"(\"{sender}\", \"{subject}\"),")
+        print()
+
+    def ignore_sender_subject(self, sender1, subject1, sender, subject):
+        return str(sender).__contains__(
+            sender1) and subject == subject1
+
     def label_emails_by_priority(self, priorities, labels, subject_low, domain_high):
         unprioritized_emails = " -label:@ReadyToArchive  -label:p_high -label:p_medium -label:p_low -label:p_unknown"
 
@@ -838,6 +992,7 @@ class GmailLabeler:
         #                                                     unprioritized_emails_unread_3d,
         #                                                     excluded_queries, subject_low, domain_high)
         # print()
+
 
     def label_emails_by_priority_category(self, labels):
         # only consider labels that are priority medium, high, very_high
@@ -866,14 +1021,16 @@ class GmailLabeler:
             print(f"{len(thread_ids)} threads for query: {query}")
         print("", flush=True)
 
+
     def map_label_to_p_cat_label(self, plabel):
-        if plabel == "p10" or plabel == "p9" :
+        if plabel == "p10" or plabel == "p9":
             p_cat_label = "p_high"
         elif plabel == "p6" or plabel == "p2" or plabel == "p8" or plabel == "p7" or plabel == 'p5':
             p_cat_label = "p_medium"
         else:
             p_cat_label = "p_low"
         return p_cat_label
+
 
     # find emails marked unpriroitized that have known priorities and remove the unknown priority label
     def prioritize_last14d_emails_unknown_senders(self, labels, priorities):
@@ -909,6 +1066,7 @@ class GmailLabeler:
             print("Finished appending unknown senders to ignore-p0 tab")
             print("sheetsURL: " + sheets_url)
             print()
+
 
     def add_priority_labels_exclude_prioritized_emails(self, labels, priorities,
                                                        unprioritized_emails, excluded_queries, subject_low,
@@ -979,6 +1137,7 @@ def label_emails_w_p_category():
     labels = labeler.get_labels()
     labeler.label_emails_by_priority_category(labels)
 
+
 def continuously_remove_p_category_from_archived_emails():
     labeler = GmailLabeler()
     while True:
@@ -995,9 +1154,11 @@ def continuously_remove_p_category_from_archived_emails():
         print("sleeping for 3 seconds")
         time.sleep(3)
 
+
 def remove_unread_high_medium():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
+
 
 def remove_stale_p_labels():
     labeler = GmailLabeler()
@@ -1023,7 +1184,6 @@ def remove_stale_p_labels():
             thread_details = labeler.get_thread_details(thread_id)
             sender = labeler.get_thread_sender(thread_details)
             subject = labeler.get_thread_subject(thread_details)
-
 
             thread_labels = labeler.get_thread_labels_simple(thread_id)
 
@@ -1060,13 +1220,14 @@ def label_emails():
     labeler.count_by_priority_inbox(labels)
     return True
 
+
 def prioritize_last14d_emails_unknown_senders():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
 
     priorities = download_sender_priorities()
     print(f"Read {len(priorities)} rows for senders2priority (Email Senders google sheet)")
-    labeler.prioritize_last14d_emails_unknown_senders( labels, priorities)
+    labeler.prioritize_last14d_emails_unknown_senders(labels, priorities)
     return True
 
 
@@ -1093,6 +1254,7 @@ def download_sender_priorities():
 
     return senders2priority
 
+
 def label_prioritized_emails_not_in_inbox():
     labeler = GmailLabeler()
     labeler.label_prioritized_emails_not_in_inbox()
@@ -1105,15 +1267,18 @@ def count_by_priority_inbox():
     labeler.count_by_priority_inbox(labels)
     return True
 
+
 def option_3():
     labeler = GmailLabeler()
     labels = labeler.count_threads()
     return True
 
+
 def option_4():
     labeler = GmailLabeler()
     labels = labeler.count_sanelater_threads()
     return True
+
 
 def timedMethod(method):
     startTime = time.time()
@@ -1122,6 +1287,7 @@ def timedMethod(method):
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{now_str}: Time elapsed {timeElapsed} seconds")
     print()
+
 
 def move_low_priority_out_of_inbox():
     labeler = GmailLabeler()
@@ -1139,7 +1305,8 @@ def move_low_priority_out_of_inbox():
             labeler.add_label_to_thread(thread_id, inboxOverFlowLabelId, inboxOverFlowLabel, False)
             labeler.remove_label_from_thread(thread_id, inboxLabelId, inboxLabel, False)
             print(".", end='', flush=True)
-        print("",  flush=True)
+        print("", flush=True)
+
 
 def daily_email_routine():
     startTime = time.time()
@@ -1152,6 +1319,7 @@ def daily_email_routine():
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{now_str}: Time elapsed {timeElapsed} seconds")
     return True
+
 
 sheetsUtil = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
 sheets_url = "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1169527381#gid=1169527381"
@@ -1193,11 +1361,25 @@ domain_high = set()
 hints_fetch_time = 0
 update_frequency_in_seconds = 60
 
+
+def analyze_sent_emails():
+    emailService = GmailLabeler()
+    emailService.analyze_sent_emails()
+
+def analyze_inbox_overflow_unread():
+    emailService = GmailLabeler()
+    emailService.analyze_inbox_overflow_unread()
+
+def analyze_inbox_overflow_read():
+    emailService = GmailLabeler()
+    emailService.analyze_inbox_overflow_read()
+
+
 def update_email_hints():
     global hints_fetch_time
     global subject_low
     global domain_high
-    if(time.time() < hints_fetch_time + update_frequency_in_seconds):
+    if (time.time() < hints_fetch_time + update_frequency_in_seconds):
         tryagainAfter = (hints_fetch_time + update_frequency_in_seconds - time.time()).__int__()
         print(f"Skipping fetching hints (e.g. low priority subjects, high priority domains)")
         print(f"We only fetch once every {update_frequency_in_seconds} seconds), try after {tryagainAfter} seconds")
@@ -1222,6 +1404,7 @@ def update_subject_low(emailService):
     for x in subject_low:
         print(x)
     print()
+
 
 def update_domain_high(emailService):
     global domain_high
@@ -1267,7 +1450,6 @@ def append_unknown_senders():
         data.append([sender])
     print("")
 
-
     sheet_url = "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1304305670#gid=1304305670"
     sheetUtils = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
     sheet_id = sheetUtils.extract_spreadsheet_id(sheet_url)
@@ -1275,10 +1457,10 @@ def append_unknown_senders():
     print(f"Finished appending unknown senders to {sheet_url}")
 
 
-
 def goodbye():
     print("Goodbye!")
     return False
+
 
 def main():
     parser = argparse.ArgumentParser(description='Email Labeler')
@@ -1297,6 +1479,7 @@ def main():
     # Initialize the labeler
 
     # labeler.remove_priority_labels(labels)
+
 
 def run_in_bg():
     while True:
@@ -1320,6 +1503,7 @@ def run_in_bg():
                 print(".", end='', flush=True)
         print()
 
+
 def run_interactively():
     # options_edit_them_here
     options = {
@@ -1332,15 +1516,20 @@ def run_interactively():
         '7': ('Calcualte domain priority', calculate_domain_priority),
         '8': ('Prioritize last14d emails from unknown senders', prioritize_last14d_emails_unknown_senders),
         '9': ('Add priority category labels (assumes threads already have priority labels)', label_emails_w_p_category),
-        '10': ('Remove stale priority labels: p_cat_labels from archived emails, unread_high_medium from read ', remove_stale_p_labels),
-        '11': ('Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
+        '10': ('Remove stale priority labels: p_cat_labels from archived emails, unread_high_medium from read ',
+               remove_stale_p_labels),
+        '11': (
+        'Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
         '12': ('Daily Email Routine', daily_email_routine),
         '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox),
         '14': ('Deprioritize emails with low priority subjects', update_email_hints),
+        '15': ('analyze sent emails', analyze_sent_emails),
+        '16': ('analyze inbox overflow unread', analyze_inbox_overflow_unread),
+        '17': ('analyze inbox overflow read', analyze_inbox_overflow_read),
 
         # if i reply to an email label it p4 at least.
 
-        '15': ('Exit', goodbye)
+        '18': ('Exit', goodbye)
     }
     while True:
         print("\n--- Menu ---")
