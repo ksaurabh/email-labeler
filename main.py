@@ -476,13 +476,15 @@ class GmailLabeler:
             # Collect all unique label IDs from thread messages
             label_ids = set()
             for message in thread.get('messages', []):
-                label_ids.update(message.get('labelIds', []))
+                messageLabelIds = message.get('labelIds', [])
+                for messageLabelId in messageLabelIds:
+                    label_ids.add(messageLabelId)
 
             # Get all labels to map IDs to names
             label_names = []
             for id in label_ids:
                 label_names.append(self.label_name(id, labels))
-                return label_names
+            return label_names
         except HttpError as error:
             print(f'An error occurred - get_thread_labels_simple: {error}')
             return []
@@ -814,6 +816,7 @@ class GmailLabeler:
 
     def parse_message(self, message):
         headers = message['payload']['headers']
+
         fromAddr = ""
         subject = ""
         cc = ""
@@ -1164,12 +1167,34 @@ def remove_stale_p_labels():
     unread_label = "unread_high_medium"
     unread_label_id = labeler.label_id(unread_label, labels)
 
-    query = f"label:unread_high_medium is:read"
-    thread_ids = labeler.search_threads_w_exclusion(query, "label:inbox", 1000)
+    query = f"label:unread_high_medium"
+    thread_ids = labeler.search_threads(query,  1000)
     print(f"Found {len(thread_ids)} for query: " + query)
+    unread = 0
+    read = 0
     for thread_id in thread_ids:
-        labeler.remove_label_from_thread(thread_id, unread_label_id, unread_label)
-    print(f"Done removing {unread_label} from these threads")
+        # check if all messages in the thread are read.
+        details = labeler.get_thread_details(thread_id)
+        subject = labeler.get_thread_subject(details)
+        sender = labeler.get_thread_sender(details)
+        thread_labels = labeler.get_thread_labels_simple(thread_id)
+
+        isUnread = thread_labels.__contains__("UNREAD")
+        if isUnread:
+            print(".", end='', flush=True)
+            # print(f"sender:{sender}")
+            # print(f"subject:{subject}")
+            # print(f"isUnread: {isUnread}")
+            # print(f"labels:{thread_labels}")
+            # print()
+            unread += 1
+        else:
+            print()
+            print(f"isUnread: {isUnread} \t subject:{subject}")
+            labeler.remove_label_from_thread(thread_id, unread_label_id, unread_label)
+            print(f" Removing {unread_label} from this thread")
+            read += 1
+    print(f"read: {read}, unread: {unread}")
     print()
 
     print("Removing p_cat_labels from archived emails")
