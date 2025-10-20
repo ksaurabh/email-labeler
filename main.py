@@ -4,6 +4,8 @@ import re
 import time
 import argparse
 
+from pathlib import Path
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -1102,7 +1104,7 @@ class GmailLabeler:
                 self.add_label_to_thread(thread_id, label_id, "p9")
                 print(f"Marking thread as high priority based on domain {domain}")
             else:
-                print("Not a low priority subject {subject}, from={email}")
+                print(f"Not a low priority subject {subject}, from={email}")
                 priority = self.priority_by_email(priorities, email)
                 if not thread_labels.__contains__(priority):
                     label_id = self.label_id(priority, labels)
@@ -1505,6 +1507,7 @@ def main():
 
 
 def run_in_bg():
+    timeToSleep = getTimeToSleep()
     while True:
         startTime = time.time()
         label_emails()
@@ -1516,8 +1519,13 @@ def run_in_bg():
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{now_str}: Time elapsed {timeElapsed} seconds")
         print()
-        if timeElapsed < 60:
-            sleepSeconds = 60 - timeElapsed
+
+        timeToSleep = getTimeToSleep()
+
+        print(f"Time to sleep = {timeToSleep}")
+
+        if timeElapsed < timeToSleep:
+            sleepSeconds = timeToSleep - timeElapsed
             print(f"sleeping for {sleepSeconds} seconds...")
             for i in range(0, sleepSeconds):
                 time.sleep(1)
@@ -1525,6 +1533,35 @@ def run_in_bg():
                     print(i, end='', flush=True)
                 print(".", end='', flush=True)
         print()
+
+
+def getTimeToSleep():
+    timeToSleep = 60
+    # Method 1: Using pathlib (recommended)
+    file_path = Path("timeToSleep.txt")
+    print(f"Checking if {file_path} exists..")
+    if file_path.exists():
+        # Get creation time (or metadata change time on Unix)
+        modified_time = file_path.stat().st_mtime
+        creation_datetime = datetime.fromtimestamp(modified_time)
+
+        # Calculate how long ago
+        time_ago = datetime.now() - creation_datetime
+
+        print(f"File exists!")
+        print(f"Created: {creation_datetime}")
+        print(f"Created {time_ago.days} days and {time_ago.seconds // 3600} hours ago")
+
+        if time_ago.seconds < 3600:
+            with open(file_path, "r") as file:
+                first_line = file.readline()
+                print(first_line)
+                timeToSleep = int(first_line)
+        else:
+            print("Time to sleep file was modified more than an hour ago, ignoring it")
+    else:
+        print("File does not exist")
+    return timeToSleep
 
 
 def run_interactively():
