@@ -662,8 +662,13 @@ class GmailLabeler:
         return details['messages'][0]['Subject']
 
     def get_thread_sender(self, details):
-        fromAddr = details['messages'][0]['From']
-        return fromAddr
+        if not details == None:
+            messages = details['messages']
+            firstMessage = messages[0]
+            fromAddr = firstMessage['From']
+            return fromAddr
+        else:
+            raise Exception("Details is None")
 
     def get_all_recipients(self, details):
         messages = details['messages']
@@ -1104,7 +1109,7 @@ class GmailLabeler:
                 self.add_label_to_thread(thread_id, label_id, "p9")
                 print(f"Marking thread as high priority based on domain {domain}")
             else:
-                print(f"Not a low priority subject {subject}, from={email}")
+                print(f"Not a low priority subject, or high domain (domain={domain}, subject={subject}, from={email}")
                 priority = self.priority_by_email(priorities, email)
                 if not thread_labels.__contains__(priority):
                     label_id = self.label_id(priority, labels)
@@ -1437,10 +1442,13 @@ def update_domain_high(emailService):
     thread_ids = emailService.search_threads("label:domain_high")
     for thread_id in thread_ids:
         thread_details = emailService.get_thread_details(thread_id)
-        sender = emailService.get_thread_sender(thread_details)
-        name, email_addr = parseaddr(sender)
-        domain = getDomainFromEmailAddress(email_addr)
-        domain_high.add(domain)
+        if thread_details != None:
+            sender = emailService.get_thread_sender(thread_details)
+            name, email_addr = parseaddr(sender)
+            domain = getDomainFromEmailAddress(email_addr)
+            domain_high.add(domain)
+        else:
+            print(f"Could not find details for thread with thread_id: {thread_id}")
     print("Domains with high priority:")
     for x in domain_high:
         print(x)
