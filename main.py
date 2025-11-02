@@ -1082,7 +1082,6 @@ class GmailLabeler:
         # Search for emails
         thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_emails, excluded_queries, 10000)
         # thread_ids = self.search_threads(unprioritized_emails, 10000)
-        totalThreads = len(thread_ids)
         threads = 0
         print(f"Found {len(thread_ids)} threads for query: {unprioritized_emails}, exlcudedQueries={excluded_queries}")
 
@@ -1092,43 +1091,72 @@ class GmailLabeler:
             if thread_details == None:
                 continue
 
-            thread_labels = self.get_thread_labels_simple(thread_id)
-            sender = self.get_thread_sender(thread_details)
-            name, email = parseaddr(sender)
-            subject = self.get_thread_subject(thread_details)
-            domain = getDomainFromEmailAddress(email)
-
-            if subject_low.__contains__((email, subject)):
-                label_id = self.label_id("p_low", labels)
-                self.add_label_to_thread(thread_id, label_id, "p_low")
-                print(f"Marking thread as low priority based on subject={subject}, from={email}")
-            elif domain_high.__contains__(domain):
-                label_id = self.label_id("p_high", labels)
-                self.add_label_to_thread(thread_id, label_id, "p_high")
-                label_id = self.label_id("p9", labels)
-                self.add_label_to_thread(thread_id, label_id, "p9")
-                print(f"Marking thread as high priority based on domain {domain}")
-            else:
-                print(f"Not a low priority subject, or high domain (domain={domain}, subject={subject}, from={email}")
-                priority = self.priority_by_email(priorities, email)
-                if not thread_labels.__contains__(priority):
-                    label_id = self.label_id(priority, labels)
-                    self.add_label_to_thread(thread_id, label_id, priority)
-                    p_cat_label = self.map_label_to_p_cat_label(priority)
-                    p_cat_label_id = self.label_id(p_cat_label, labels)
-                    self.add_label_to_thread(thread_id, p_cat_label_id, p_cat_label)
-
-                    date_string = self.get_thread_max_date_string(thread_details)
-                    print(
-                        f"{threads}/{totalThreads}: Adding priority label {priority} to sender={sender}, rcvd={date_string} email={email} labels={thread_labels} label_id={label_id}")
-                    print("")
+            print(f"Adding label to thread {threads}/{len(thread_ids)}")
+            self.add_priority_label_to_thread(domain_high, labels, priorities, subject_low, thread_details, thread_id)
 
         # marked unread high /medium priority emails with unread_high_medium
         self.label_unread(labels, "p_medium")
         self.label_unread(labels, "p_high")
         print("Done marking unread_high_medium")
         print()
+    def print_unprioritized_emails(self):
+        unprioritized_emails = " -label:@ReadyToArchive  -label:p_high -label:p_medium -label:p_low -label:p_unknown"
 
+        print()
+        print("Print unprioritized emails in inbox...")
+        excluded_queries = self.get_excluded_p_cat_label_queries()
+        unprioritized_emails_inbox = "label:inbox" + unprioritized_emails
+
+        # Search for emails
+        thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_emails_inbox, excluded_queries, 10000)
+        # thread_ids = self.search_threads(unprioritized_emails, 10000)
+        totalThreads = len(thread_ids)
+        threads = 0
+        print(f"Found {len(thread_ids)} threads for query: {unprioritized_emails_inbox}, exlcudedQueries={excluded_queries}")
+        for thread_id in thread_ids:
+            threads += 1
+            thread_details = self.get_thread_details(thread_id)
+            if thread_details == None:
+                continue
+
+            sender = self.get_thread_sender(thread_details)
+            subject = self.get_thread_subject(thread_details)
+            thread_labels = self.get_thread_labels_simple(thread_id)
+            print(f"from:{sender} \t subject={subject}, thread_labels={thread_labels}")
+        print()
+
+    def add_priority_label_to_thread(self, domain_high, labels, priorities, subject_low, thread_details, thread_id):
+        thread_labels = self.get_thread_labels_simple(thread_id)
+        sender = self.get_thread_sender(thread_details)
+        name, email = parseaddr(sender)
+        subject = self.get_thread_subject(thread_details)
+        domain = getDomainFromEmailAddress(email)
+        date_string = self.get_thread_max_date_string(thread_details)
+        if subject_low.__contains__((email, subject)):
+            label_id = self.label_id("p_low", labels)
+            self.add_label_to_thread(thread_id, label_id, "p_low")
+            print(f"Marking thread as low priority based on subject={subject}, from={email}")
+        elif domain_high.__contains__(domain):
+            label_id = self.label_id("p_high", labels)
+            self.add_label_to_thread(thread_id, label_id, "p_high")
+            label_id = self.label_id("p9", labels)
+            self.add_label_to_thread(thread_id, label_id, "p9")
+            print(f"Marking thread as high priority based on domain {domain}")
+        else:
+            print(f"Not a low priority subject, or high domain (domain={domain}, subject={subject}, from={email}")
+            print(f"thread_labels={thread_labels}")
+            priority = self.priority_by_email(priorities, email)
+            if not thread_labels.__contains__(priority):
+                label_id = self.label_id(priority, labels)
+                self.add_label_to_thread(thread_id, label_id, priority)
+                print(f"Adding priority label {priority} to sender={sender}, rcvd={date_string} email={email} labels={thread_labels} label_id={label_id}")
+            p_cat_label = self.map_label_to_p_cat_label(priority)
+            if not thread_labels.__contains__(p_cat_label):
+                p_cat_label_id = self.label_id(p_cat_label, labels)
+                self.add_label_to_thread(thread_id, p_cat_label_id, p_cat_label)
+                print(f"Adding p_cat_label: {p_cat_label}  to sender={sender}, rcvd={date_string} email={email} labels={thread_labels} p_cat_label_id={p_cat_label_id}")
+
+        print("")
 
     def label_unread(self, labels, priority_label):
         query = f"is:unread label:inbox label:{priority_label} -label:unread_high_medium"
@@ -1250,6 +1278,34 @@ def label_emails():
     labeler.count_by_priority_inbox(labels)
     return True
 
+def print_unprioritized_emails():
+    labeler = GmailLabeler()
+    labeler.print_unprioritized_emails()
+
+def label_thread_by_query():
+    query = input("Enter search query: ")
+    print(f"Fetching (at most 10) threads that matches this query: {query}")
+
+
+    labeler = GmailLabeler()
+    threads = labeler.search_threads(query, 10)
+    print(f"Found {len(threads)} threads")
+    labels = labeler.get_labels()
+
+    priorities = download_sender_priorities()
+    print(f"Read {len(priorities)} rows for senders2priority (Email Senders google sheet)")
+    update_email_hints()
+    print()
+
+    for thread_id in threads:
+        thread_details = labeler.get_thread_details(thread_id)
+        if thread_details != None:
+            labeler.add_priority_label_to_thread(domain_high, labels, priorities, subject_low, thread_details, thread_id)
+            move_low_priority_out_of_inbox_v2(labeler, labels, [thread_id])
+        else:
+            print("Could not find thread details")
+
+
 
 def prioritize_last14d_emails_unknown_senders():
     labeler = GmailLabeler()
@@ -1322,20 +1378,66 @@ def timedMethod(method):
 def move_low_priority_out_of_inbox():
     labeler = GmailLabeler()
     labels = labeler.get_labels()
+    move_low_priority_out_of_inbox_v2(labeler, labels)
+
+
+def move_low_priority_out_of_inbox_v2(labeler, labels, includeOnlyThreadIds=None):
     low_p_cat_labels = ['p_low', 'p_unknown', '@ReadyToArchive']
     inboxOverFlowLabel = '@InboxOverflow'
     inboxOverFlowLabelId = labeler.label_id(inboxOverFlowLabel, labels)
     inboxLabel = 'INBOX'
     inboxLabelId = labeler.label_id(inboxLabel, labels)
+    print()
+    print("Moving low priority emails out of inbox...")
+    print("Fetching labels for emails in indbox")
+    id2Labels = fetchLabelsForEmailsInInbox(labeler)
     for label in low_p_cat_labels:
         label_id = labeler.label_id(label, labels)
-        thread_ids = labeler.search_threads(f"label:inbox label:{label}", 1000)
+        thread_ids = searchInboxForEmailsWithLabel(label, labeler, id2Labels)
         print(f"Moving {len(thread_ids)} threads matching label:{label} from inbox to inboxOverflow", flush=True)
-        for thread_id in thread_ids:
-            labeler.add_label_to_thread(thread_id, inboxOverFlowLabelId, inboxOverFlowLabel, False)
-            labeler.remove_label_from_thread(thread_id, inboxLabelId, inboxLabel, False)
-            print(".", end='', flush=True)
-        print("", flush=True)
+        if(includeOnlyThreadIds != None):
+            for id in includeOnlyThreadIds:
+                foundInSearch = thread_ids.__contains__(id)
+                print(f"Found {id} in search results, would have moved it")
+        else:
+            for thread_id in thread_ids:
+                labeler.add_label_to_thread(thread_id, inboxOverFlowLabelId, inboxOverFlowLabel, False)
+                labeler.remove_label_from_thread(thread_id, inboxLabelId, inboxLabel, False)
+                print(".", end='', flush=True)
+            print("", flush=True)
+
+
+def searchInboxForEmailsWithLabel(label, labeler, mapId2Labels):
+    thread_ids = labeler.search_threads(f"label:inbox", 1000)
+    print(f"Found {len(thread_ids)} emails in inbox")
+    result =[]
+    for id in thread_ids:
+        print(".", end='', flush=True)
+        labels = get_cached_labels(id, mapId2Labels)
+        for email_label in labels:
+            if label.lower() == email_label.lower():
+                result.append(id)
+    return result
+
+
+def get_cached_labels(id, mapId2Labels):
+    if mapId2Labels.__contains__(id):
+        labels = mapId2Labels[id]
+    else:
+        labels = labeler.get_thread_labels_simple(id)
+        mapId2Labels[id] = labels
+    return labels
+
+
+def fetchLabelsForEmailsInInbox(labeler):
+    thread_ids = labeler.search_threads(f"label:inbox", 1000)
+    print(f"Found {len(thread_ids)} emails in inbox")
+    result = dict()
+    for id in thread_ids:
+        print(".", end='', flush=True)
+        labels = labeler.get_thread_labels_simple(id)
+        result[id] = labels
+    return result
 
 
 def daily_email_routine():
@@ -1594,10 +1696,12 @@ def run_interactively():
         '15': ('analyze sent emails', analyze_sent_emails),
         '16': ('analyze inbox overflow unread', analyze_inbox_overflow_unread),
         '17': ('analyze inbox overflow read', analyze_inbox_overflow_read),
+        '18': ('Label threads matching a query', label_thread_by_query),
+        '19': ('Print unprioritized emails', print_unprioritized_emails),
 
         # if i reply to an email label it p4 at least.
 
-        '18': ('Exit', goodbye)
+        '20': ('Exit', goodbye)
     }
     while True:
         print("\n--- Menu ---")
