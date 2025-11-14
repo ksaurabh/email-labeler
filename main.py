@@ -52,7 +52,7 @@ def append_sender_priorities(result, df):
 
 
 # Gmail API scope for reading and modifying emails
-SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/spreadsheets']
+SCOPES = ['https://www.googleapis.com/auth/gmail.modify', 'https://www.googleapis.com/auth/spreadsheets', 'https://mail.google.com/']
 
 
 class GmailLabeler:
@@ -1394,6 +1394,7 @@ def move_low_priority_out_of_inbox_v2(labeler, labels, includeOnlyThreadIds=None
     for label in low_p_cat_labels:
         label_id = labeler.label_id(label, labels)
         thread_ids = searchInboxForEmailsWithLabel(label, labeler, id2Labels)
+        print()
         print(f"Moving {len(thread_ids)} threads matching label:{label} from inbox to inboxOverflow", flush=True)
         if(includeOnlyThreadIds != None):
             for id in includeOnlyThreadIds:
@@ -1413,14 +1414,14 @@ def searchInboxForEmailsWithLabel(label, labeler, mapId2Labels):
     result =[]
     for id in thread_ids:
         print(".", end='', flush=True)
-        labels = get_cached_labels(id, mapId2Labels)
+        labels = get_cached_labels(id, mapId2Labels, labeler)
         for email_label in labels:
             if label.lower() == email_label.lower():
                 result.append(id)
     return result
 
 
-def get_cached_labels(id, mapId2Labels):
+def get_cached_labels(id, mapId2Labels, labeler):
     if mapId2Labels.__contains__(id):
         labels = mapId2Labels[id]
     else:
@@ -1431,6 +1432,7 @@ def get_cached_labels(id, mapId2Labels):
 
 def fetchLabelsForEmailsInInbox(labeler):
     thread_ids = labeler.search_threads(f"label:inbox", 1000)
+    print()
     print(f"Found {len(thread_ids)} emails in inbox")
     result = dict()
     for id in thread_ids:
@@ -1612,6 +1614,7 @@ def main():
 
     """Example usage of the Gmail labeler."""
     # Initialize the labeler
+    labeler = GmailLabeler()
 
     # labeler.remove_priority_labels(labels)
 
