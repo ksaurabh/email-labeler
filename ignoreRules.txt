@@ -1,0 +1,62 @@
+to:carolyn@airmdr.com
+from:anthony@airmdr.com subject:[SOAR] AGT Epics - Days In Progress
+from:anthony@airmdr.com subject:Time Spent on AGT Stories
+domain:neilpatel.com
+domain:rb2b.com
+domain:capterra.com
+domain:smartkarma.com
+domain:tivly.com
+from:accounting@airmdr.com recipients:ceo-office@airmdr.com
+from:members@athena.com
+to:kumar+news@airmdr.com
+from:lenny@substack.com
+from:security@airmdr.com to:soc@airmdr.com
+domain:pitchbook.com
+domain:headaicorexboard.com
+domain:toast-restaurants.com
+domain:substack.com
+domain:asana.com
+domain:crunchbase.com
+domain:marketingmax.io
+from:marketing@alcorn.law
+subject:Your receipt from DBA: Demandii
+domain:headaicorexunion.org
+subject:Your receipt from Athena Labs
+domain:ait-us.co
+domain:nooks.in
+from:no-reply@otter.ai
+from:support@pulley.com
+domain:weekdone.com
+domain:coefficient.io
+from:customermarketing@hubspot.com
+from:designspaceagency.com subject:Invoice
+recipients:marketing@airmdr.com not recipients:kumar@airmdr.com
+domain:gem.com
+domain:mkt.zoominfo.com
+domain:ramp.com
+recipients:accounting@airmdr.com not recipients:kumar@airmdr.com
+from:predictablerevenue-newsletter@mail.beehiiv.com
+from:coldstack.info
+domain:storygen-content.info
+from:bill.com subject:A bill payment has been scheduled
+from:info@horizon3.ai
+domain:growthxcontent.co
+from:ebq.com subject:EBQ - AirMDR Report
+domain:safelogic.com
+from:shieldapp.ai
+from:alex.glover@carta.com
+from:scout-global.com
+from:replit.com
+from:heygen.com
+from:circle.so subject:Nearshore Cyber Community
+from:atlassian.com
+from:concierge@expensify.com
+from:notifications@expensify.com
+from:mrktg.forrester.com
+from:intuit@eq.intuit.com
+from:pagodasearch.com
+from:learn.mail.monday.com
+from:conversionnestx.co
+from:email.1password.com
+from:softr.io
+

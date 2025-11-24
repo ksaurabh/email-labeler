@@ -1,8 +1,10 @@
+import json
 import os
 import pickle
 import re
 import time
 import argparse
+import random
 
 from pathlib import Path
 
@@ -128,12 +130,30 @@ class GmailLabeler:
     def get_labels(self):
         """Get all available labels in the Gmail account."""
         try:
-            results = self.service.users().labels().list(userId='me').execute()
+            request = self.service.users().labels().list(userId='me')
+            # results = request.execute()
+            results = self.execute_with_backoff(request)
             labels = results.get('labels', [])
             return labels
         except HttpError as error:
             print(f"An error occurred while fetching labels: {error}")
             return []
+
+    def execute_with_backoff(self, request):
+        backoff = 1
+        for i in range(16):  # up to ~64 seconds
+            try:
+                return request.execute()
+            except HttpError as e:
+                if e.resp.status == 429:
+                    print(e)
+                    backoff_sleep = backoff + random.random()
+                    print(f"Sleeping to backoff - {backoff_sleep} seconds" )
+                    time.sleep(backoff_sleep)
+                    backoff *= 2
+                else:
+                    raise
+        raise Exception("Max retries exceeded")
 
     def move_thread_to_inbox(self, thread_id: str, user_id: str = 'me') -> bool:
         """
@@ -426,6 +446,16 @@ class GmailLabeler:
             if label['name'] == label_name:
                 return label['id']
         return label_name
+    def label_id_unsafe(self, label_name, labels):
+        for label in labels:
+            if label['name'] == label_name:
+                return label['id']
+
+        for label in labels:
+            if not str(label['name']).startswith("ZD"):
+                print(label['name'])
+
+        return None
 
     def label_name(self, label_id, labels):
         for label in labels:
@@ -670,6 +700,9 @@ class GmailLabeler:
         else:
             raise Exception("Details is None")
 
+    def get_max_date(self, details):
+        return details['max_date_string']
+
     def get_all_recipients(self, details):
         messages = details['messages']
         receipients = set()
@@ -905,6 +938,12 @@ class GmailLabeler:
         domainCounter.print_by_count()
 
     def analyze_inbox_overflow_unread(self):
+        inboxOverflowLabelName = "@InboxOverflow"
+        inboxOverflowLabelID = self.label_id_unsafe(inboxOverflowLabelName, self.get_labels())
+        print(f"inboxOverflowLabelID={inboxOverflowLabelID}")
+        input("Enter any key to continue...")
+
+        self.getIgnoreRules()
         print()
         days = int(input("how many days do you want to scan:"))
         total_unread=0
@@ -923,59 +962,209 @@ class GmailLabeler:
         print(f"Total unread: {total_unread}")
         print()
 
-        query = f"label:@inboxoverflow is:unread label:@ReadyToArchive after:{end}"
+        query = f"label:@inboxoverflow is:unread  after:{end} -label:inbox"
         threads = self.search_threads(query, 1000)
         print(f"Found {len(threads)} threads, query: {query}")
         labels = self.get_labels()
         ignore_name = "ignore"
         ignore_id = self.label_id(ignore_name, labels)
-        left_unread = set()
+        left_unread = []
         for thread in threads:
             details = self.get_thread_details(thread)
             subject = self.get_thread_subject(details)
             sender = self.get_thread_sender(details)
+            domain = get_domain(sender)
             recipients = self.get_all_recipients(details)
+            max_date = self.get_max_date(details)
             message_count = details['message_count']
 
-            ignore = False
-            if len(recipients) == 1 and recipients.__contains__("mdr-ops@airmdr.com"):
-                ignore = True
-            if len(recipients) == 1 and recipients.__contains__("kumar@airmdr.com") and str(sender).__contains__("no-reply@zoom.us"):
-                ignore = True
-            if len(recipients) == 2 and recipients.__contains__("mdr-ops@airmdr.com") and recipients.__contains__("anthony@airmdr.com"):
-                ignore = True
+            ignore = self.safeToIgnore(message_count, recipients, sender, subject)
 
-            ignore_sender_subjects = [
-                ("data-science@airmdr.com", "Your OpenAI API account has been funded"),
-                ("suyash@airmdr.com", "AWS Cost Report for AWS & GCP - Last 1d")
-            ]
-
-            for p in ignore_sender_subjects:
-                sender1, subject1 = p
-                if self.ignore_sender_subject(sender1, subject1, sender, subject):
-                    ignore = True
-
-            if recipients.__contains__("Receipts@airmdr.com") and not recipients.__contains__("kumar@airmdr.com"):
-                ignore = True
-            if message_count == 1 and (
-                    str(subject).startswith("Accepted")
-                    or str(subject).__contains__("card has been charged")
-                    or str(subject).__contains__("High Priority Bugs Open for too long")
-                    or str(subject).__contains__("Execution failure alert")
-            ):
-                ignore = True
+            info = f"recipients.count={len(recipients)}, max_date:{max_date} from:{ sender} subject:{ subject} recipients: {str(recipients)}"
+            infoObj = {
+                "subject": subject,
+                "sender": sender,
+                "domain": domain,
+                "recipients": recipients,
+                "max_date": max_date,
+                "message_count": message_count,
+                "thread_id": thread
+            }
 
             if ignore:
-                print("Marking as read - from:" + sender + " subject:" + subject)
+                print(f"Marking as read - {info}")
                 self.mark_thread_as_read(thread, False)
             else:
-                left_unread.add((sender, subject))
+                left_unread.append(infoObj)
+                print(f"unread - {info}")
+                ignore = self.applyIgnoreRules(infoObj)
+                if ignore:
+                    self.mark_thread_as_read(infoObj['thread_id'])
+                else:
+                    input("Add an ignore rule and enter any key to continue...")
+                    ignore = self.applyIgnoreRules(infoObj)
+                    print(f"ignore={ignore}")
+                    if not ignore:
+                        thread_id = infoObj['thread_id']
+                        self.move_thread_to_inbox(thread_id)
+                        self.remove_label_from_thread(thread_id, inboxOverflowLabelID, inboxOverflowLabelName)
+                    input("enter any key to continue...")
 
-        print("Lead unread:")
-        for x in left_unread:
-            sender, subject = x
-            print(f"(\"{sender}\", \"{subject}\"),")
+        print(f"Total Left unread: {len(left_unread)}")
         print()
+
+    ignoreRules = []
+    ignoreRulesLastModifiedTime = 0
+
+    # import re
+    # text = "Email: john@example.com, Phone: 123-456-7890"
+    # emails = re.findall(r'[\w.-]+@[\w.-]+', text)
+    # phones = re.findall(r'\d{3}-\d{3}-\d{4}', text)
+    # print(emails, phones)  # ['john@example.com'] ['123-456-7890']
+    def applyIgnoreRules(self, infoObject):
+        ignoreRules = self.getIgnoreRules()
+        for (ruletype, rule, ruletokens) in ignoreRules:
+            if ruletype == 1 and str(infoObject['recipients']).__contains__(ruletokens[0]):
+                return True
+            elif ruletype==2  and str(infoObject['sender']).__contains__(ruletokens[0]) and str(infoObject['subject']).__contains__(ruletokens[1]):
+                return True
+            elif ruletype==3  and str(infoObject['domain']).__contains__(ruletokens[0]):
+                return True
+            elif ruletype==4  and str(infoObject['sender']).__contains__(ruletokens[0]) and str(infoObject['recipients']).__contains__(ruletokens[1]) :
+                return True
+            elif ruletype==5  and str(infoObject['sender']).__contains__(ruletokens[0]):
+                return True
+            elif ruletype==6  and str(infoObject['subject']).__contains__(ruletokens[0].strip()):
+                return True
+            elif ruletype==7  and str(infoObject['sender']).__contains__(ruletokens[0].strip()) and not str(infoObject['sender']).__contains__(ruletokens[1].strip()):
+                return True
+        print(f"No rule match! {infoObject}")
+        return False
+
+    def parseIgnoreRules(self, rule):
+        ignoreRules = self.ignoreRules
+        if self.checkRuleMatch(rule, r"\s*to:(\S+)", 1):
+            return True
+
+        pattern2 = r"\s*from:(\S+)\s+subject:(.*)"
+        if self.checkRuleMatch(rule,pattern2, 2):
+            return True
+
+        pattern3 = r"\s*domain:(.*)"
+        if self.checkRuleMatch(rule,pattern3, 3):
+            return True
+
+        pattern4 = r"\s*from:(\S+)\s+recipients:(\S+)"
+        if self.checkRuleMatch(rule,pattern4, 4):
+            return True
+
+        pattern5 = r"\s*from:(\S+)\s*$"
+        if self.checkRuleMatch(rule,pattern5, 5):
+            return True
+
+        pattern6 = r"\s*subject:(.*)$"
+        if self.checkRuleMatch(rule,pattern6, 6):
+            return True
+
+        pattern7 = r"\s*recipients:(\S+)\s+not\s+recipients:(\S+)$"
+        if self.checkRuleMatch(rule,pattern7, 7):
+            return True
+
+        print(f"Rule {rule} did not match any known patterns")
+        input("Enter any key to continue..")
+        return False
+
+    def checkRuleMatch(self, rule, pattern1, ruletype):
+        matchedRule = False
+        match = re.search(pattern1, rule)
+        if match != None:
+            ruletokens = match.groups()
+            if len(ruletokens) > 0:
+                self.ignoreRules.append((ruletype, rule, ruletokens))
+                matchedRule = True
+        return matchedRule
+
+    def getIgnoreRules(self):
+        timeToSleep = 300
+        # Method 1: Using pathlib (recommended)
+        file_path = Path("ignoreRules.txt")
+        print(f"Checking if {file_path} exists..")
+        if file_path.exists():
+            # Get creation time (or metadata change time on Unix)
+            modified_time = file_path.stat().st_mtime
+            print(f"File exists!")
+            if self.ignoreRulesLastModifiedTime == None or self.ignoreRulesLastModifiedTime < modified_time:
+                self.ignoreRulesLastModifiedTime = modified_time
+                print("It was recently modified..reading it now..")
+                with open(file_path, "r") as file:
+                    for line in file:
+                        if line.strip() != '':
+                            print(line.strip())
+                            self.parseIgnoreRules(line.strip())
+            else:
+                print("No change since last read..ignoring it..")
+        else:
+            print(f"{file_path} does not exist")
+
+        return self.ignoreRules
+
+    def safeToIgnore(self, message_count, recipients, sender, subject):
+        ignore = False
+        if not recipients.__contains__("kumar@airmdr") and (
+                recipients.__contains__("receipts@airmdr.com") or
+                recipients.__contains__("mdr-ops@airmdr.com")  or
+                recipients.__contains__("data-science@airmdr.com")
+        ):
+            ignore = True
+        elif (
+                str(sender).__contains__("do-not-reply@gong.io") or
+                str(sender).__contains__("hello@mercury.com") or
+                str(sender).__contains__("assistant@avoma.com")
+        ):
+            ignore = True
+        elif (
+                str(sender).__contains__("no-reply@airmdr.com") and len(recipients) == 1 and recipients.__contains__("support@airmdr.com")
+        ):
+            ignore = True
+        elif (
+                subject.startswith("Updated invitation")
+                or subject.startswith("Re: Invitation:")
+                or subject.startswith("Tentatively Accepted:")
+                or subject.startswith("Invitation")
+                or subject.startswith("Declined:")
+                or subject.startswith("AI Usage Report")
+                or subject.startswith("[JIRA]")
+                or subject.startswith("Your daily Gong:")
+        ):
+            ignore = True
+        elif sender == "suyash@airmdr.com" and subject.startswith("AI Usage Report"):
+            ignore = True
+        elif len(recipients) == 1 and recipients.__contains__("mdr-ops@airmdr.com"):
+            ignore = True
+        elif len(recipients) == 1 and recipients.__contains__("kumar@airmdr.com") and str(sender).__contains__(
+                "no-reply@zoom.us"):
+            ignore = True
+        elif len(recipients) == 2 and recipients.__contains__("mdr-ops@airmdr.com") and recipients.__contains__(
+                "anthony@airmdr.com"):
+            ignore = True
+        ignore_sender_subjects = [
+            ("data-science@airmdr.com", "Your OpenAI API account has been funded"),
+            ("suyash@airmdr.com", "AWS Cost Report for AWS & GCP - Last 1d")
+        ]
+        for p in ignore_sender_subjects:
+            sender1, subject1 = p
+            if not ignore and self.ignore_sender_subject(sender1, subject1, sender, subject):
+                ignore = True
+        if not ignore and recipients.__contains__("Receipts@airmdr.com") and not recipients.__contains__("kumar@airmdr.com"):
+            ignore = True
+        if not ignore and message_count == 1 and (
+                str(subject).startswith("Accepted")
+                or str(subject).__contains__("card has been charged")
+                or str(subject).__contains__("High Priority Bugs Open for too long")
+                or str(subject).__contains__("Execution failure alert")
+        ):
+            ignore = True
+        return ignore
 
     def ignore_sender_subject(self, sender1, subject1, sender, subject):
         return str(sender).__contains__(
@@ -1321,11 +1510,11 @@ def download_sender_priorities():
     downloader = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
     df1 = downloader.download_sheet_by_url(
         "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1339297741",
-        "senders2priority")
+        "senders2priority", "senders2.priority.csv")
 
     df2 = downloader.download_sheet_by_url(
         "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1339297741",
-        "ignore-p0")
+        "ignore-p0", "ignore-p0.csv")
 
     senders2priority = []
     append_sender_priorities(senders2priority, df1)
@@ -1380,17 +1569,27 @@ def move_low_priority_out_of_inbox():
     labels = labeler.get_labels()
     move_low_priority_out_of_inbox_v2(labeler, labels)
 
+lastTimeMovedLowPriorityEmailsOutOfInbox = 0
+timeBetweenMovingLowPriorityEmailsOutOfInbox = 300
 
 def move_low_priority_out_of_inbox_v2(labeler, labels, includeOnlyThreadIds=None):
-    low_p_cat_labels = ['p_low', 'p_unknown', '@ReadyToArchive']
+    global lastTimeMovedLowPriorityEmailsOutOfInbox
+    global timeBetweenMovingLowPriorityEmailsOutOfInbox
+    if lastTimeMovedLowPriorityEmailsOutOfInbox > time.time() - timeBetweenMovingLowPriorityEmailsOutOfInbox:
+        print(f"Skipping moving low priority emails out of inbox..." +
+              f"not enough time has elapsed - {time.time() - lastTimeMovedLowPriorityEmailsOutOfInbox} seconds")
+        return
+    lastTimeMovedLowPriorityEmailsOutOfInbox = time.time()
+    low_p_cat_labels = ['@ReadyToArchive']
     inboxOverFlowLabel = '@InboxOverflow'
     inboxOverFlowLabelId = labeler.label_id(inboxOverFlowLabel, labels)
     inboxLabel = 'INBOX'
     inboxLabelId = labeler.label_id(inboxLabel, labels)
     print()
     print("Moving low priority emails out of inbox...")
-    print("Fetching labels for emails in indbox")
-    id2Labels = fetchLabelsForEmailsInInbox(labeler)
+    print("Fetching labels for emails in inbox")
+    # id2Labels = fetchLabelsForEmailsInInbox(labeler)
+    id2Labels = time_function(fetchLabelsForEmailsInInbox, labeler)
     for label in low_p_cat_labels:
         label_id = labeler.label_id(label, labels)
         thread_ids = searchInboxForEmailsWithLabel(label, labeler, id2Labels)
@@ -1453,6 +1652,28 @@ def daily_email_routine():
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"{now_str}: Time elapsed {timeElapsed} seconds")
     return True
+
+
+def time_function(func, *args, **kwargs):
+    """
+    Execute a function and print how long it took to run.
+
+    Args:
+        func: The function to time
+        *args: Positional arguments to pass to func
+        **kwargs: Keyword arguments to pass to func
+
+    Returns:
+        The result of the function call
+    """
+    start_time = time.time()
+    result = func(*args, **kwargs)
+    end_time = time.time()
+
+    elapsed_time = end_time - start_time
+    print(f"Function '{func.__name__}' took {elapsed_time:.6f} seconds to run")
+
+    return result
 
 
 sheetsUtil = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
@@ -1649,7 +1870,7 @@ def run_in_bg():
 
 
 def getTimeToSleep():
-    timeToSleep = 60
+    timeToSleep = 300
     # Method 1: Using pathlib (recommended)
     file_path = Path("timeToSleep.txt")
     print(f"Checking if {file_path} exists..")
