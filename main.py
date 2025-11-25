@@ -151,6 +151,8 @@ class GmailLabeler:
                     print(f"Sleeping to backoff - {backoff_sleep} seconds" )
                     time.sleep(backoff_sleep)
                     backoff *= 2
+                    if(backoff > 1800):
+                        backoff = 1800
                 else:
                     raise
         raise Exception("Max retries exceeded")
@@ -940,8 +942,8 @@ class GmailLabeler:
     def analyze_inbox_overflow_unread(self):
         inboxOverflowLabelName = "@InboxOverflow"
         inboxOverflowLabelID = self.label_id_unsafe(inboxOverflowLabelName, self.get_labels())
-        print(f"inboxOverflowLabelID={inboxOverflowLabelID}")
-        input("Enter any key to continue...")
+        # print(f"inboxOverflowLabelID={inboxOverflowLabelID}")
+        # input("Enter any key to continue...")
 
         self.getIgnoreRules()
         print()
@@ -995,23 +997,81 @@ class GmailLabeler:
                 print(f"Marking as read - {info}")
                 self.mark_thread_as_read(thread, False)
             else:
-                left_unread.append(infoObj)
-                print(f"unread - {info}")
                 ignore = self.applyIgnoreRules(infoObj)
                 if ignore:
                     self.mark_thread_as_read(infoObj['thread_id'])
                 else:
-                    input("Add an ignore rule and enter any key to continue...")
-                    ignore = self.applyIgnoreRules(infoObj)
-                    print(f"ignore={ignore}")
-                    if not ignore:
-                        thread_id = infoObj['thread_id']
-                        self.move_thread_to_inbox(thread_id)
-                        self.remove_label_from_thread(thread_id, inboxOverflowLabelID, inboxOverflowLabelName)
-                    input("enter any key to continue...")
+                    left_unread.append(infoObj)
+                    self.handle_not_safe_to_ignore(infoObj)
+
+                print()
+
+                # else:
+                    # input("Add an ignore rule and enter any key to continue...")
+                    # ignore = self.applyIgnoreRules(infoObj)
+                    # print(f"ignore={ignore}")
+                    # if not ignore:
+                    #     thread_id = infoObj['thread_id']
+                    #     self.move_thread_to_inbox(thread_id)
+                    #     self.remove_label_from_thread(thread_id, inboxOverflowLabelID, inboxOverflowLabelName)
+                    # input("enter any key to continue...")
 
         print(f"Total Left unread: {len(left_unread)}")
         print()
+
+    def inbox_overflow_skip(self, infoObj):
+        print("Skipping...")
+
+    def inbox_overflow_ignore_domain(self, infoObj):
+        domain=infoObj['domain']
+        ignoreRule = f"domain:{domain}"
+        with open('ignoreRules.txt', 'a') as f:
+            f.write(ignoreRule)
+        print(f"Appended {ignoreRule} to ignoreRules.txt")
+        self.mark_thread_as_read(infoObj['thread_id'])
+
+    def inbox_overflow_ignore_sender(self, infoObj):
+        sender=infoObj['sender']
+        email_addr = self.get_email_address_from_sender(sender)
+        ignoreRule = f"from:{email_addr}"
+        with open('ignoreRules.txt', 'a') as f:
+            f.write(ignoreRule)
+        print(f"Appended {ignoreRule} to ignoreRules.txt")
+        self.mark_thread_as_read(infoObj['thread_id'])
+
+    def inbox_overflow_recipient(self, infoObj):
+        recipients=list(infoObj['recipients'])
+        if len(recipients) != 1:
+            print(f"Skipping..Expecting 1 recipient, found {len(recipients)}")
+        else:
+            recipient = recipients[0]
+            ignoreRule = f"recipients:{recipient} not recipients:kumar@airmdr.com"
+            with open('ignoreRules.txt', 'a') as f:
+                f.write(ignoreRule)
+            print(f"Appended {ignoreRule} to ignoreRules.txt")
+            self.mark_thread_as_read(infoObj['thread_id'])
+
+    def get_email_address_from_sender(self, sender):
+        name, email_addr = parseaddr(sender)
+        return email_addr
+
+    def handle_not_safe_to_ignore(self, infoObj):
+        options = {
+            '1': ('Ignore emails from domain', self.inbox_overflow_ignore_domain),
+            '2': ('Ignore emails from sender', self.inbox_overflow_ignore_sender),
+            '3': ('Ignore emails to recipient (not me)', self.inbox_overflow_recipient),
+            '4': ('Skip', self.inbox_overflow_skip)
+        }
+        print("\n--- Menu ---")
+        for key, (description, _) in options.items():
+            print(f"{key}. {description}")
+
+        choice = input("Enter your choice: ")
+
+        if choice in options:
+            options[choice][1](infoObj)  # Call the function
+        else:
+            print("Invalid choice. Please try again.")
 
     ignoreRules = []
     ignoreRulesLastModifiedTime = 0
@@ -1038,8 +1098,14 @@ class GmailLabeler:
                 return True
             elif ruletype==7  and str(infoObject['sender']).__contains__(ruletokens[0].strip()) and not str(infoObject['sender']).__contains__(ruletokens[1].strip()):
                 return True
-        print(f"No rule match! {infoObject}")
+        self.printEmailInfo(infoObject)
+        print(f"No rule match!")
+        print()
         return False
+
+    def printEmailInfo(self, infoObject):
+        for key in infoObject:
+            print(f"{key:20} {infoObject[key]}")
 
     def parseIgnoreRules(self, rule):
         ignoreRules = self.ignoreRules
@@ -1088,23 +1154,23 @@ class GmailLabeler:
         timeToSleep = 300
         # Method 1: Using pathlib (recommended)
         file_path = Path("ignoreRules.txt")
-        print(f"Checking if {file_path} exists..")
+        # print(f"Checking if {file_path} exists..")
         if file_path.exists():
             # Get creation time (or metadata change time on Unix)
             modified_time = file_path.stat().st_mtime
-            print(f"File exists!")
+            # print(f"File exists!")
             if self.ignoreRulesLastModifiedTime == None or self.ignoreRulesLastModifiedTime < modified_time:
                 self.ignoreRulesLastModifiedTime = modified_time
-                print("It was recently modified..reading it now..")
+                # print("It was recently modified..reading it now..")
                 with open(file_path, "r") as file:
                     for line in file:
                         if line.strip() != '':
-                            print(line.strip())
+                            # print(line.strip())
                             self.parseIgnoreRules(line.strip())
-            else:
-                print("No change since last read..ignoring it..")
-        else:
-            print(f"{file_path} does not exist")
+            # else:
+                # print("No change since last read..ignoring it..")
+        # else:
+        #     print(f"{file_path} does not exist")
 
         return self.ignoreRules
 

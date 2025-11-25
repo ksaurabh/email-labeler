@@ -59,4 +59,5 @@ from:learn.mail.monday.com
 from:conversionnestx.co
 from:email.1password.com
 from:softr.io
-
+domain:webolutionstrackkit.co
+from:thatstartupguy@mail.beehiiv.comdomain:headaimaxpro.orgfrom:linkedin@em.linkedin.comrecipients:ceo-office@airmdr.com not recipients:kumar@airmdr.comdomain:sequoia.comfrom:marketing-info@sumologic.comdomain:phalanxstrategic.comdomain:mydogood.com
