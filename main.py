@@ -1048,6 +1048,7 @@ class GmailLabeler:
             ignoreRule = f"recipients:{recipient} not recipients:kumar@airmdr.com"
             with open('ignoreRules.txt', 'a') as f:
                 f.write(ignoreRule)
+                f.write("\n")
             print(f"Appended {ignoreRule} to ignoreRules.txt")
             self.mark_thread_as_read(infoObj['thread_id'])
 
