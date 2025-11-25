@@ -60,4 +60,11 @@ from:conversionnestx.co
 from:email.1password.com
 from:softr.io
 domain:webolutionstrackkit.co
-from:thatstartupguy@mail.beehiiv.comdomain:headaimaxpro.orgfrom:linkedin@em.linkedin.comrecipients:ceo-office@airmdr.com not recipients:kumar@airmdr.comdomain:sequoia.comfrom:marketing-info@sumologic.comdomain:phalanxstrategic.comdomain:mydogood.com
+from:thatstartupguy@mail.beehiiv.com
+domain:headaimaxpro.org
+from:linkedin@em.linkedin.com
+recipients:ceo-office@airmdr.com not recipients:kumar@airmdr.com
+domain:sequoia.com
+from:marketing-info@sumologic.com
+domain:phalanxstrategic.com
+domain:mydogood.com
