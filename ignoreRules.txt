@@ -175,3 +175,41 @@ domain:research.outreach.io
 domain:message.fedex.com
 domain:nmrk.com
 domain:iconscout.com
+domain:e.read.ai
+from:data-science@airmdr.com recipients:kumar@airmdr.com
+domain:peakstonenexus.com
+domain:brandray.co
+domain:email.scalekit.com
+domain:teampipelineos.com
+from:sales.whxleaders@informa.com
+domain:closingexgo.co
+from:help@avoma.com subject:Thank you for your payment
+domain:tdatalent.com
+domain:joinoutreachcore.org
+domain:f5.com
+domain:campaign.eventbrite.com
+domain:globaltradeupdates.info
+from:aws-marketing-email-replies@amazon.com
+from:sar@saasgurusfinance.com
+from:marketing@hello.bill.com
+from:callie.monroe@youroutboundhive.org
+from:noreply@tm.openai.com
+from:mayanklahoti345@gmail.com
+recipients:kumar+nearshorecyber@airmdr.com not recipients:kumar@airmdr.com
+recipients:kumar+linkedin@airmdr.com not recipients:kumar@airmdr.com
+domain:introgrowhq.co
+from:account-services@inform.bill.com recipients:kumar@airmdr.com
+domain:pdffiller.com
+domain:cushwake.com
+from:updates@mail.liveflow.io
+domain:thewayo.co
+domain:smartsaganpassport.com
+domain:growthpathhq.co
+domain:jupidme.com
+from:no-reply@email.slackhq.com
+from:noreply@po.atlassian.net
+from:marketing@hublead.app
+from:info@retool.com
+from:mabel@demoset.co
+from:updates@e.stripe.com
+domain:thecodewits.com
