@@ -941,7 +941,7 @@ class GmailLabeler:
             print()
         domainCounter.print_by_count()
 
-    def analyze_inbox_overflow_unread(self):
+    def analyze_inbox_overflow_unread(self, process_not_safe_to_ignore=True):
         inboxOverflowLabelName = "@InboxOverflow"
         inboxOverflowLabelID = self.label_id_unsafe(inboxOverflowLabelName, self.get_labels())
         # print(f"inboxOverflowLabelID={inboxOverflowLabelID}")
@@ -1004,7 +1004,8 @@ class GmailLabeler:
                     self.mark_thread_as_read(infoObj['thread_id'])
                 else:
                     left_unread.append(infoObj)
-                    self.handle_not_safe_to_ignore(infoObj)
+                    if process_not_safe_to_ignore:
+                        self.handle_not_safe_to_ignore(infoObj)
 
                 print()
 
@@ -1890,9 +1891,13 @@ def analyze_sent_emails():
     emailService = GmailLabeler()
     emailService.analyze_sent_emails()
 
-def analyze_inbox_overflow_unread():
+def analyze_inbox_overflow_unread_no_stop():
     emailService = GmailLabeler()
-    emailService.analyze_inbox_overflow_unread()
+    emailService.analyze_inbox_overflow_unread(False)
+
+def analyze_inbox_overflow_unread_w_stops():
+    emailService = GmailLabeler()
+    emailService.analyze_inbox_overflow_unread(True)
 
 def analyze_inbox_overflow_read():
     emailService = GmailLabeler()
@@ -2098,7 +2103,8 @@ def run_interactively():
         '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox),
         '14': ('Deprioritize emails with low priority subjects', update_email_hints),
         '15': ('analyze sent emails', analyze_sent_emails),
-        '16': ('analyze inbox overflow unread', analyze_inbox_overflow_unread),
+        '16': ('analyze inbox overflow unread - do not stop for emails that cannot be marked as read', analyze_inbox_overflow_unread_no_stop),
+        '16b': ('analyze inbox overflow unread - stop for emails that cannot be marked as read' , analyze_inbox_overflow_unread_w_stops),
         '17': ('analyze inbox overflow read', analyze_inbox_overflow_read),
         '18': ('Label threads matching a query', label_thread_by_query),
         '19': ('Print unprioritized emails', print_unprioritized_emails),
