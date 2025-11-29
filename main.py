@@ -1055,6 +1055,12 @@ class GmailLabeler:
         self.append_ignore_rule(ignoreRule)
         self.mark_thread_as_read(infoObj['thread_id'])
 
+    def inbox_overflow_move_to_inbox_and_whitelist(self, infoObj):
+        self.inbox_overflow_move_to_inbox(infoObj)
+        sender = infoObj['sender']
+        priority = input("Enter priority:")
+        add_to_senders2priority(sender, priority)
+
     def inbox_overflow_move_to_inbox(self, infoObj):
         thread_id = infoObj['thread_id']
         self.move_thread_to_inbox(thread_id)
@@ -1095,7 +1101,8 @@ class GmailLabeler:
             '4': ('Ignore emails to recipient (not me)', self.inbox_overflow_recipient),
             '5': ('Mark as read', self.inbox_overflow_mark_read),
             '6': ('Move to inbox', self.inbox_overflow_move_to_inbox),
-            '7': ('Skip', self.inbox_overflow_skip)
+            '7': ('Move to inbox and whitelist', self.inbox_overflow_move_to_inbox_and_whitelist),
+            '8': ('Skip', self.inbox_overflow_skip)
         }
         print("\n--- Menu ---")
         for key, (description, _) in options.items():
@@ -1457,6 +1464,7 @@ class GmailLabeler:
             label = "unread_high_medium"
             label_id = self.label_id(label, labels)
             self.add_label_to_thread(thread_id, label_id, label)
+labeler = GmailLabeler()
 
 
 def label_emails_w_p_category():
@@ -1562,7 +1570,7 @@ def remove_stale_p_labels():
 
 
 def label_emails():
-    labeler = GmailLabeler()
+    global labeler
     labels = labeler.get_labels()
 
     priorities = download_sender_priorities()
@@ -1833,6 +1841,8 @@ sheetsUtil = GoogleSpreadsheetUtil.GoogleSpreadsheetUtil()
 sheets_url = "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1169527381#gid=1169527381"
 sheets_id = sheetsUtil.extract_spreadsheet_id(sheets_url)
 
+sender_priority_sheets_url = "https://docs.google.com/spreadsheets/d/1JqOnZFU3rghc24LM21wLXfYp3q-JvqDOZOw_GYvgaOg/edit?gid=1339297741#gid=1339297741"
+sender_priority_sheets_id = sheetsUtil.extract_spreadsheet_id(sender_priority_sheets_url)
 
 def calculate_domain_priority():
     df = sheetsUtil.download_sheet_as_csv(sheets_id, "domains")
@@ -1861,6 +1871,12 @@ def calculate_domain_priority():
     print(f"Finished appending {len(new_domains)} new domains to the domains tab")
     print("url: " + sheets_url)
     print()
+
+def add_to_senders2priority(sender, priority):
+    rows = []
+    rows.append([sender, int(priority)])
+    sheetsUtil.append_multiple_rows(sender_priority_sheets_id, "senders2priority", rows)
+    print(f"Adding {sender} with priority {priority} to senders2priority (whitelist)")
 
 
 # hints to prioritize
@@ -2024,6 +2040,13 @@ def one_background_loop():
     print()
     return timeElapsed
 
+def add_sender_to_whitelist():
+    global labeler
+    sender = input("Enter sender email:")
+    priority = input("Enter priority:")
+    add_to_senders2priority(sender, priority)
+
+
 
 def getTimeToSleep():
     timeToSleep = 300
@@ -2080,10 +2103,11 @@ def run_interactively():
         '18': ('Label threads matching a query', label_thread_by_query),
         '19': ('Print unprioritized emails', print_unprioritized_emails),
         '20': ('One background loop', one_background_loop),
+        '21': ('Add sender to whitelist', add_sender_to_whitelist),
 
         # if i reply to an email label it p4 at least.
 
-        '21': ('Exit', goodbye)
+        '22': ('Exit', goodbye)
     }
     while True:
         print("\n--- Menu ---")
