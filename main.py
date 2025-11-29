@@ -1110,7 +1110,7 @@ class GmailLabeler:
         recipient = recipients[0]
         if len(recipients) != 1:
             recipient = self.ask_to_chose_a_recipient(recipients)
-        ignoreRule = f"from:{email} recipients:kumar@airmdr.com"
+        ignoreRule = f"from:{email} recipients:{recipient}"
         self.append_ignore_rule(ignoreRule)
         self.mark_thread_as_read(infoObj['thread_id'])
 
