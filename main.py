@@ -529,6 +529,8 @@ class GmailLabeler:
     def count_by_priority_inbox(self, labels):
         startTime = time.time()
         self.count_by_priority_inbox_untimed(labels)
+        # template to measure and print timeElapsed
+        # startTime = time.time()
         timeElapsed = int(time.time() - startTime)
         now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         print(f"{now_str}: Time elapsed {timeElapsed} seconds", flush=True)
@@ -1016,41 +1018,70 @@ class GmailLabeler:
                     #     self.remove_label_from_thread(thread_id, inboxOverflowLabelID, inboxOverflowLabelName)
                     # input("enter any key to continue...")
 
-        print(f"Total Left unread: {len(left_unread)}")
+        print(f"query={query}")
+        print(f"Total threads={len(threads)}, left unread: {len(left_unread)}")
         print()
 
     def inbox_overflow_skip(self, infoObj):
         print("Skipping...")
 
+    def inbox_overflow_mark_read(self, infoObj):
+        self.mark_thread_as_read(infoObj['thread_id'])
+
     def inbox_overflow_ignore_domain(self, infoObj):
         domain=infoObj['domain']
         ignoreRule = f"domain:{domain}"
+        self.append_ignore_rule(ignoreRule)
+        self.mark_thread_as_read(infoObj['thread_id'])
+
+    def append_ignore_rule(self, ignoreRule):
         with open('ignoreRules.txt', 'a') as f:
             f.write(ignoreRule)
+            f.write("\n")
         print(f"Appended {ignoreRule} to ignoreRules.txt")
-        self.mark_thread_as_read(infoObj['thread_id'])
 
     def inbox_overflow_ignore_sender(self, infoObj):
         sender=infoObj['sender']
         email_addr = self.get_email_address_from_sender(sender)
         ignoreRule = f"from:{email_addr}"
-        with open('ignoreRules.txt', 'a') as f:
-            f.write(ignoreRule)
-        print(f"Appended {ignoreRule} to ignoreRules.txt")
+        self.append_ignore_rule(ignoreRule)
         self.mark_thread_as_read(infoObj['thread_id'])
+
+    def inbox_overflow_ignore_subject_from_sender(self, infoObj):
+        sender=infoObj['sender']
+        subject=infoObj['subject']
+        email_addr = self.get_email_address_from_sender(sender)
+        ignoreRule = f"from:{email_addr} subject:{subject}"
+        self.append_ignore_rule(ignoreRule)
+        self.mark_thread_as_read(infoObj['thread_id'])
+
+    def inbox_overflow_move_to_inbox(self, infoObj):
+        thread_id = infoObj['thread_id']
+        self.move_thread_to_inbox(thread_id)
+
+    def ask_to_chose_a_recipient(self, recipients):
+        print()
+        print("Pick a recipient:")
+        index = 0
+        for recipient in recipients[:5]:
+            index += 1
+            print(f"{index}: {recipient}")
+        answer = input("Enter your choice: ")
+        try:
+            return recipients[int(answer)-1]
+        except Exception as error:
+            print(error)
+            print("Not a valid choice, try again.")
+            return self.ask_to_chose_a_recipient(recipients)
 
     def inbox_overflow_recipient(self, infoObj):
         recipients=list(infoObj['recipients'])
+        recipient = recipients[0]
         if len(recipients) != 1:
-            print(f"Skipping..Expecting 1 recipient, found {len(recipients)}")
-        else:
-            recipient = recipients[0]
-            ignoreRule = f"recipients:{recipient} not recipients:kumar@airmdr.com"
-            with open('ignoreRules.txt', 'a') as f:
-                f.write(ignoreRule)
-                f.write("\n")
-            print(f"Appended {ignoreRule} to ignoreRules.txt")
-            self.mark_thread_as_read(infoObj['thread_id'])
+            recipient = self.ask_to_chose_a_recipient(recipients)
+        ignoreRule = f"recipients:{recipient} not recipients:kumar@airmdr.com"
+        self.append_ignore_rule(ignoreRule)
+        self.mark_thread_as_read(infoObj['thread_id'])
 
     def get_email_address_from_sender(self, sender):
         name, email_addr = parseaddr(sender)
@@ -1060,8 +1091,11 @@ class GmailLabeler:
         options = {
             '1': ('Ignore emails from domain', self.inbox_overflow_ignore_domain),
             '2': ('Ignore emails from sender', self.inbox_overflow_ignore_sender),
-            '3': ('Ignore emails to recipient (not me)', self.inbox_overflow_recipient),
-            '4': ('Skip', self.inbox_overflow_skip)
+            '3': ('Ignore emails w subject from sender', self.inbox_overflow_ignore_subject_from_sender),
+            '4': ('Ignore emails to recipient (not me)', self.inbox_overflow_recipient),
+            '5': ('Mark as read', self.inbox_overflow_mark_read),
+            '6': ('Move to inbox', self.inbox_overflow_move_to_inbox),
+            '7': ('Skip', self.inbox_overflow_skip)
         }
         print("\n--- Menu ---")
         for key, (description, _) in options.items():
@@ -1097,7 +1131,8 @@ class GmailLabeler:
                 return True
             elif ruletype==6  and str(infoObject['subject']).__contains__(ruletokens[0].strip()):
                 return True
-            elif ruletype==7  and str(infoObject['sender']).__contains__(ruletokens[0].strip()) and not str(infoObject['sender']).__contains__(ruletokens[1].strip()):
+            # pattern7 = r"\s*recipients:(\S+)\s+not\s+recipients:(\S+)$"
+            elif ruletype==7  and str(infoObject['recipients']).__contains__(ruletokens[0].strip()) and not str(infoObject['recipients']).__contains__(ruletokens[1].strip()):
                 return True
         self.printEmailInfo(infoObject)
         print(f"No rule match!")
@@ -1110,38 +1145,38 @@ class GmailLabeler:
 
     def parseIgnoreRules(self, rule):
         ignoreRules = self.ignoreRules
-        if self.checkRuleMatch(rule, r"\s*to:(\S+)", 1):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, r"\s*to:(\S+)", 1):
             return True
 
         pattern2 = r"\s*from:(\S+)\s+subject:(.*)"
-        if self.checkRuleMatch(rule,pattern2, 2):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, pattern2, 2):
             return True
 
         pattern3 = r"\s*domain:(.*)"
-        if self.checkRuleMatch(rule,pattern3, 3):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, pattern3, 3):
             return True
 
         pattern4 = r"\s*from:(\S+)\s+recipients:(\S+)"
-        if self.checkRuleMatch(rule,pattern4, 4):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, pattern4, 4):
             return True
 
         pattern5 = r"\s*from:(\S+)\s*$"
-        if self.checkRuleMatch(rule,pattern5, 5):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, pattern5, 5):
             return True
 
         pattern6 = r"\s*subject:(.*)$"
-        if self.checkRuleMatch(rule,pattern6, 6):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, pattern6, 6):
             return True
 
         pattern7 = r"\s*recipients:(\S+)\s+not\s+recipients:(\S+)$"
-        if self.checkRuleMatch(rule,pattern7, 7):
+        if self.checkRuleMatchAndAppendToIgnoreRules(rule, pattern7, 7):
             return True
 
         print(f"Rule {rule} did not match any known patterns")
         input("Enter any key to continue..")
         return False
 
-    def checkRuleMatch(self, rule, pattern1, ruletype):
+    def checkRuleMatchAndAppendToIgnoreRules(self, rule, pattern1, ruletype):
         matchedRule = False
         match = re.search(pattern1, rule)
         if match != None:
@@ -1453,6 +1488,8 @@ def remove_unread_high_medium():
 
 
 def remove_stale_p_labels():
+    startTime = time.time()
+
     labeler = GmailLabeler()
     labels = labeler.get_labels()
     unread_label = "unread_high_medium"
@@ -1518,6 +1555,10 @@ def remove_stale_p_labels():
                 label_id = labeler.label_id(p_cat_label, labels)
                 labeler.remove_label_from_thread(thread_id, label_id, p_cat_label)
             print(".", end="", flush=True)
+        timeElapsed = int(time.time() - startTime)
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"{now_str}: Time elapsed {timeElapsed} seconds")
+        print()
 
 
 def label_emails():
@@ -1632,9 +1673,27 @@ def timedMethod(method):
 
 
 def move_low_priority_out_of_inbox():
+    startTime = time.time()
     labeler = GmailLabeler()
     labels = labeler.get_labels()
     move_low_priority_out_of_inbox_v2(labeler, labels)
+
+    timeElapsed = int(time.time() - startTime)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{now_str}: Move low priority emails out of inbox - Time elapsed {timeElapsed} seconds", flush=True)
+    print()
+
+def move_low_priority_out_of_inbox_fast_timed():
+    startTime = time.time()
+    labeler = GmailLabeler()
+    labels = labeler.get_labels()
+    move_low_priority_out_of_inbox_fast(labeler, labels)
+
+    timeElapsed = int(time.time() - startTime)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{now_str}: Move low priority emails out of inbox (fast) - Time elapsed {timeElapsed} seconds", flush=True)
+    print()
+
 
 lastTimeMovedLowPriorityEmailsOutOfInbox = 0
 timeBetweenMovingLowPriorityEmailsOutOfInbox = 300
@@ -1673,6 +1732,29 @@ def move_low_priority_out_of_inbox_v2(labeler, labels, includeOnlyThreadIds=None
                 print(".", end='', flush=True)
             print("", flush=True)
 
+def move_low_priority_out_of_inbox_fast(labeler, labels, includeOnlyThreadIds=None):
+    low_p_cat_labels = ['@ReadyToArchive']
+    inboxOverFlowLabel = '@InboxOverflow'
+    inboxOverFlowLabelId = labeler.label_id(inboxOverFlowLabel, labels)
+    inboxLabel = 'INBOX'
+    inboxLabelId = labeler.label_id(inboxLabel, labels)
+    print()
+    print("Moving low priority emails out of inbox... (fast version)")
+    for label in low_p_cat_labels:
+        thread_ids = searchInboxForEmailsWithLabel_fast(label, labeler)
+        print()
+        print(f"Moving {len(thread_ids)} threads matching label:{label} from inbox to inboxOverflow", flush=True)
+        if(includeOnlyThreadIds != None):
+            for id in includeOnlyThreadIds:
+                foundInSearch = thread_ids.__contains__(id)
+                print(f"Found {id} in search results, would have moved it")
+        else:
+            for thread_id in thread_ids:
+                labeler.add_label_to_thread(thread_id, inboxOverFlowLabelId, inboxOverFlowLabel, False)
+                labeler.remove_label_from_thread(thread_id, inboxLabelId, inboxLabel, False)
+                print(".", end='', flush=True)
+            print("", flush=True)
+
 
 def searchInboxForEmailsWithLabel(label, labeler, mapId2Labels):
     thread_ids = labeler.search_threads(f"label:inbox", 1000)
@@ -1685,6 +1767,10 @@ def searchInboxForEmailsWithLabel(label, labeler, mapId2Labels):
             if label.lower() == email_label.lower():
                 result.append(id)
     return result
+def searchInboxForEmailsWithLabel_fast(label, labeler):
+    query = f"label:inbox label:{label}"
+    print(f"Searching inbox query={query}")
+    return labeler.search_threads(query, 1000)
 
 
 def get_cached_labels(id, mapId2Labels, labeler):
@@ -1910,17 +1996,7 @@ def main():
 def run_in_bg():
     timeToSleep = getTimeToSleep()
     while True:
-        startTime = time.time()
-        label_emails()
-        move_low_priority_out_of_inbox()
-        remove_stale_p_labels()
-        count_by_priority_inbox()
-
-        timeElapsed = int(time.time() - startTime)
-        now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        print(f"{now_str}: Time elapsed {timeElapsed} seconds")
-        print()
-
+        timeElapsed = one_background_loop()
         timeToSleep = getTimeToSleep()
 
         print(f"Time to sleep = {timeToSleep}")
@@ -1934,6 +2010,19 @@ def run_in_bg():
                     print(i, end='', flush=True)
                 print(".", end='', flush=True)
         print()
+
+
+def one_background_loop():
+    startTime = time.time()
+    label_emails()
+    move_low_priority_out_of_inbox()
+    remove_stale_p_labels()
+    count_by_priority_inbox()
+    timeElapsed = int(time.time() - startTime)
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{now_str}: Time elapsed {timeElapsed} seconds")
+    print()
+    return timeElapsed
 
 
 def getTimeToSleep():
@@ -1966,11 +2055,12 @@ def getTimeToSleep():
 
 
 def run_interactively():
-    # options_edit_them_here
+    # edit options here
     options = {
         '1': ('Inbox: Count by Priority', count_by_priority_inbox),
         '2': ('Label Emails', label_emails),
-        '3': ('Move p_low, p_unknown and @ReadyToArchive out of inbox', move_low_priority_out_of_inbox),
+        '3': ('Move @ReadyToArchive out of inbox (fast)', move_low_priority_out_of_inbox_fast_timed),
+        '3b': ('Move p_low, p_unknown and @ReadyToArchive out of inbox (full)', move_low_priority_out_of_inbox),
         '4': ('Show Threads stats', option_3),
         '5': ('Show SaneLater stats', option_4),
         '6': ('Append unknown senders', append_unknown_senders),
@@ -1989,10 +2079,11 @@ def run_interactively():
         '17': ('analyze inbox overflow read', analyze_inbox_overflow_read),
         '18': ('Label threads matching a query', label_thread_by_query),
         '19': ('Print unprioritized emails', print_unprioritized_emails),
+        '20': ('One background loop', one_background_loop),
 
         # if i reply to an email label it p4 at least.
 
-        '20': ('Exit', goodbye)
+        '21': ('Exit', goodbye)
     }
     while True:
         print("\n--- Menu ---")
