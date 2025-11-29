@@ -133,3 +133,35 @@ from:no-reply@fellow.app
 domain:glomollc.com
 recipients:marketing@airmdr.com not recipients:kumar@airmdr.com
 from:noreply@email.openai.com
+domain:mail.returnonsecurity.com
+domain:mail.grammarly.com
+from:feedback@slack.com
+from:fedexoffice@message.fedex.com
+from:ciosurge@mail.beehiiv.com
+domain:bigmarker.com
+from:social-in@accel.com
+domain:perdoo.com
+from:microsoft-noreply@microsoft.com subject:View your Microsoft 365 Business Standard invoice
+domain:gamma.app
+domain:topbordburg.com
+from:ryan-estes@mail.beehiiv.com
+from:noreply@liveflow.io subject:Credit card payment processed for LiveFlow Business renewal
+domain:insightssmedias.co
+domain:hautejets.com
+domain:kodastaff.com
+domain:mail.coastfunding.com
+domain:starttwizz.com
+domain:atlascashengine.com
+domain:e.adobe.com
+domain:alignedup.com
+from:notifications@avoma.com
+domain:techelefante.com
+from:teampulse@pulseconferences.com
+from:c.c@gtmwow.com
+from:kuzmanperic@gmail.com
+domain:demohivego.co
+from:mihir.jobalia@bmo.com
+domain:activefence.com
+domain:windmillcontacts.com
+from:crowdcasts@crowdstrike.com
+domain:octamomentum.co
