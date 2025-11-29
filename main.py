@@ -941,12 +941,13 @@ class GmailLabeler:
             print()
         domainCounter.print_by_count()
 
-    def analyze_inbox_overflow_unread(self, process_not_safe_to_ignore=True):
+    def analyze_inbox_overflow_unread(self, process_not_safe_to_ignore=True, onlyStats=False):
         inboxOverflowLabelName = "@InboxOverflow"
         inboxOverflowLabelID = self.label_id_unsafe(inboxOverflowLabelName, self.get_labels())
         # print(f"inboxOverflowLabelID={inboxOverflowLabelID}")
         # input("Enter any key to continue...")
 
+        labels = self.get_labels()
         self.getIgnoreRules()
         print()
         days = int(input("how many days do you want to scan:"))
@@ -954,10 +955,13 @@ class GmailLabeler:
         for i in range(1, days):
             start = self.date_n_days_ago(i)
             end = self.date_n_days_ago(i-1)
-            query = f"label:@inboxoverflow is:unread before:{end} after:{start}"
+            query = f"label:@inboxoverflow is:unread before:{end} after:{start} -label:inbox"
             threads = self.search_threads(query, 1000)
             print(f"Found {len(threads)} unread threads, query: {query}")
+            if not onlyStats:
+                self.process_inbox_overrflow_unread_threads(query, threads, process_not_safe_to_ignore, labels)
             total_unread += len(threads)
+
         end = self.date_n_days_ago(days)
         query = f"label:@inboxoverflow is:unread before:{end}"
         threads = self.search_threads(query, 1000)
@@ -966,10 +970,8 @@ class GmailLabeler:
         print(f"Total unread: {total_unread}")
         print()
 
-        query = f"label:@inboxoverflow is:unread  after:{end} -label:inbox"
-        threads = self.search_threads(query, 1000)
-        print(f"Found {len(threads)} threads, query: {query}")
-        labels = self.get_labels()
+
+    def process_inbox_overrflow_unread_threads(self, query, threads, process_not_safe_to_ignore, labels):
         ignore_name = "ignore"
         ignore_id = self.label_id(ignore_name, labels)
         left_unread = []
@@ -984,7 +986,7 @@ class GmailLabeler:
 
             ignore = self.safeToIgnore(message_count, recipients, sender, subject)
 
-            info = f"recipients.count={len(recipients)}, max_date:{max_date} from:{ sender} subject:{ subject} recipients: {str(recipients)}"
+            info = f"recipients.count={len(recipients)}, max_date:{max_date} from:{sender} subject:{subject} recipients: {str(recipients)}"
             infoObj = {
                 "subject": subject,
                 "sender": sender,
@@ -1010,15 +1012,14 @@ class GmailLabeler:
                 print()
 
                 # else:
-                    # input("Add an ignore rule and enter any key to continue...")
-                    # ignore = self.applyIgnoreRules(infoObj)
-                    # print(f"ignore={ignore}")
-                    # if not ignore:
-                    #     thread_id = infoObj['thread_id']
-                    #     self.move_thread_to_inbox(thread_id)
-                    #     self.remove_label_from_thread(thread_id, inboxOverflowLabelID, inboxOverflowLabelName)
-                    # input("enter any key to continue...")
-
+                # input("Add an ignore rule and enter any key to continue...")
+                # ignore = self.applyIgnoreRules(infoObj)
+                # print(f"ignore={ignore}")
+                # if not ignore:
+                #     thread_id = infoObj['thread_id']
+                #     self.move_thread_to_inbox(thread_id)
+                #     self.remove_label_from_thread(thread_id, inboxOverflowLabelID, inboxOverflowLabelName)
+                # input("enter any key to continue...")
         print(f"query={query}")
         print(f"Total threads={len(threads)}, left unread: {len(left_unread)}")
         print()
@@ -1066,8 +1067,9 @@ class GmailLabeler:
 
     def whitelist(self, infoObj):
         sender = infoObj['sender']
+        email = self.parseemailaddr(sender)
         priority = input("Enter priority:")
-        add_to_senders2priority(sender, priority)
+        add_to_senders2priority(email, priority)
 
     def inbox_overflow_move_to_inbox(self, infoObj):
         thread_id = infoObj['thread_id']
@@ -1097,6 +1099,21 @@ class GmailLabeler:
         self.append_ignore_rule(ignoreRule)
         self.mark_thread_as_read(infoObj['thread_id'])
 
+    def parseemailaddr(self, sender):
+        name, email= parseaddr(sender)
+        return email
+
+    def inbox_overflow_from_to_recipient(self, infoObj):
+        sender = infoObj['sender']
+        email = self.parseemailaddr(sender)
+        recipients=list(infoObj['recipients'])
+        recipient = recipients[0]
+        if len(recipients) != 1:
+            recipient = self.ask_to_chose_a_recipient(recipients)
+        ignoreRule = f"from:{email} recipients:kumar@airmdr.com"
+        self.append_ignore_rule(ignoreRule)
+        self.mark_thread_as_read(infoObj['thread_id'])
+
     def get_email_address_from_sender(self, sender):
         name, email_addr = parseaddr(sender)
         return email_addr
@@ -1111,7 +1128,8 @@ class GmailLabeler:
             '6': ('Mark as read and whitelist', self.inbox_overflow_mark_read_and_whitelist),
             '7': ('Move to inbox', self.inbox_overflow_move_to_inbox),
             '8': ('Move to inbox and whitelist', self.inbox_overflow_move_to_inbox_and_whitelist),
-            '9': ('Skip', self.inbox_overflow_skip)
+            '9': ('Ignore emails from this sender to recipient', self.inbox_overflow_from_to_recipient),
+            '10': ('Skip', self.inbox_overflow_skip)
         }
         print("\n--- Menu ---")
         for key, (description, _) in options.items():
@@ -1899,6 +1917,10 @@ def analyze_sent_emails():
     emailService = GmailLabeler()
     emailService.analyze_sent_emails()
 
+def analyze_inbox_overflow_unread_only_stats():
+    emailService = GmailLabeler()
+    emailService.analyze_inbox_overflow_unread(False, True)
+
 def analyze_inbox_overflow_unread_no_stop():
     emailService = GmailLabeler()
     emailService.analyze_inbox_overflow_unread(False)
@@ -2113,6 +2135,7 @@ def run_interactively():
         '15': ('analyze sent emails', analyze_sent_emails),
         '16': ('analyze inbox overflow unread - do not stop for emails that cannot be marked as read', analyze_inbox_overflow_unread_no_stop),
         '16b': ('analyze inbox overflow unread - stop for emails that cannot be marked as read' , analyze_inbox_overflow_unread_w_stops),
+        '16c': ('analyze inbox overflow unread - only stats' , analyze_inbox_overflow_unread_only_stats),
         '17': ('analyze inbox overflow read', analyze_inbox_overflow_read),
         '18': ('Label threads matching a query', label_thread_by_query),
         '19': ('Print unprioritized emails', print_unprioritized_emails),
