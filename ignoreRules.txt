@@ -165,3 +165,13 @@ domain:activefence.com
 domain:windmillcontacts.com
 from:crowdcasts@crowdstrike.com
 domain:octamomentum.co
+domain:shared1.ccsend.com
+domain:webners.com
+domain:equinix.com
+domain:email.parkwhiz.com
+domain:metabase.com
+domain:kingsleynexus.com
+domain:research.outreach.io
+domain:message.fedex.com
+domain:nmrk.com
+domain:iconscout.com
