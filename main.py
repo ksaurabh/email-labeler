@@ -1029,6 +1029,10 @@ class GmailLabeler:
     def inbox_overflow_mark_read(self, infoObj):
         self.mark_thread_as_read(infoObj['thread_id'])
 
+    def inbox_overflow_mark_read_and_whitelist(self, infoObj):
+        self.mark_thread_as_read(infoObj['thread_id'])
+        self.whitelist(infoObj)
+
     def inbox_overflow_ignore_domain(self, infoObj):
         domain=infoObj['domain']
         ignoreRule = f"domain:{domain}"
@@ -1058,6 +1062,9 @@ class GmailLabeler:
 
     def inbox_overflow_move_to_inbox_and_whitelist(self, infoObj):
         self.inbox_overflow_move_to_inbox(infoObj)
+        self.whitelist(infoObj)
+
+    def whitelist(self, infoObj):
         sender = infoObj['sender']
         priority = input("Enter priority:")
         add_to_senders2priority(sender, priority)
@@ -1101,9 +1108,10 @@ class GmailLabeler:
             '3': ('Ignore emails w subject from sender', self.inbox_overflow_ignore_subject_from_sender),
             '4': ('Ignore emails to recipient (not me)', self.inbox_overflow_recipient),
             '5': ('Mark as read', self.inbox_overflow_mark_read),
-            '6': ('Move to inbox', self.inbox_overflow_move_to_inbox),
-            '7': ('Move to inbox and whitelist', self.inbox_overflow_move_to_inbox_and_whitelist),
-            '8': ('Skip', self.inbox_overflow_skip)
+            '6': ('Mark as read and whitelist', self.inbox_overflow_mark_read_and_whitelist),
+            '7': ('Move to inbox', self.inbox_overflow_move_to_inbox),
+            '8': ('Move to inbox and whitelist', self.inbox_overflow_move_to_inbox_and_whitelist),
+            '9': ('Skip', self.inbox_overflow_skip)
         }
         print("\n--- Menu ---")
         for key, (description, _) in options.items():
