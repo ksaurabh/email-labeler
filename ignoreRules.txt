@@ -213,3 +213,152 @@ from:info@retool.com
 from:mabel@demoset.co
 from:updates@e.stripe.com
 domain:thecodewits.com
+domain:iq.bigtime.net
+domain:marketwithdayta.com
+domain:hoz-intel.com
+domain:inboundsy.co
+domain:contentsmashit.com
+from:marketing-ops@airmdr.com recipients:support@airmdr.com
+domain:pursuitsalesgtm.com
+from:dealhub@scrut.io
+from:sophie@alcorn.law
+from:events@mail.events.business.hsbc.com
+from:startupworldcup@mail.beehiiv.com
+from:sc-noreply@google.com
+domain:newclevelandbenefitpartner.com
+from:notifications@collective.com recipients:invoices@airmdr.com
+domain:motioncueglobal.com
+from:no-reply@hubspot.com recipients:simon.chan@airmdr.com
+domain:campaignantapp.co
+domain:clearesult.com
+from:joe.vinci@rhisac.org
+domain:set2closeteam.com
+from:invoice+statements+acct_1Db53JFQpMabuwzt@stripe.com
+domain:kickstandbuy.com
+from:hello@info.1password.com
+domain:scalematerev.com
+recipients:privacy@airmdr.com not recipients:kumar@airmdr.com
+from:hello@emailmeter.com
+domain:yournextclients.com
+domain:fusionprbase.com
+from:invoice+statements+acct_1038Ba2tsvpQFpr7@stripe.com
+from:james.moccasine@gmail.com
+domain:evvolvveholdings.com
+domain:strativgroup.com
+from:anahita@mintlify.com
+from:notifications@phantombuster.com
+domain:hireic.com
+from:product-team@hubspot.com
+domain:realinstantlyairun.com
+domain:e2enetwork.biz
+domain:dealflowwave.co
+domain:retool.com
+from:productupdates@gong.io
+domain:blinqlabz.com
+domain:brandbotlabs.co
+from:hi@mail.cursor.com
+domain:hello.design.com
+domain:seraphdirect.com
+domain:pnptc.com
+domain:aicelerate.me
+domain:data365product.com
+domain:dysnixproducts.com
+from:noreply@embroker.com
+domain:get-strategicfinds.com
+domain:demoant.co
+domain:invitations.clozd.com
+domain:searchtosale.io
+from:mj.santiago@zoom.us
+from:jchau@hubspot.com
+domain:campaignb2b.com
+from:receipts+acct_1IK1n5GLbIh3iVB0@stripe.com
+domain:email.savills.info
+from:miroverse@mail.miro.com
+from:kamlesh.patil.ecelliitkgp@gmail.com
+from:ceo-office@airmdr.com recipients:ceo-office@airmdr.com
+domain:winbeverlyhillspublishing.com
+domain:facesign.ai
+domain:helloauroraforce.com
+from:immad.akhund@mercury.com
+domain:conversionproly.co
+domain:revllm.com
+from:sales.whxlabsdubai@informa.com
+domain:fathom.video
+domain:fordewind-us.com
+domain:withreval.com
+from:npssurvey@gong.io
+domain:blackpointcyber.com
+from:jimwkirkland@gmail.com
+domain:usecopygazer.tech
+domain:infoirongate.info
+domain:dnb.com
+from:strategicresearch@mail.thehartford.com
+domain:webinstantlyaifree.com
+from:noreply@outreach.io
+domain:plugtalkfusion.com
+domain:emailtxlabz.com
+domain:gmail.com
+from:feedback@email.slackhq.com
+from:shaneevans@gong.io
+domain:digireps.net
+domain:elfuego.mx
+from:kumar@airmdr.com subject:Proposed new time: Kumar Saurabh / Eric Tan @ Tue Nov 4, 2025 10:30am - 11am (PST) (Kumar Saurabh)
+from:akshay@airmdr.com subject:Proposed new time: Blocking time to prep for QBR @ Thu Nov 6, 2025 11am - 1pm (PST) (kumar@airmdr.com)
+domain:latitudeworld.com
+from:akshay@airmdr.com subject:Proposed new time: Blocking time to prep for QBR @ Thu Nov 6, 2025 10am - 12pm (PST) (kumar@airmdr.com)
+from:akshay@airmdr.com subject:Proposed new time: Blocking time to prep for QBR @ Wed Nov 5, 2025 10am - 12pm (PST) (kumar@airmdr.com)
+from:akshay@airmdr.com subject:Canceled event: Option 2 Proposal: AirMDR/RevCentric Partners re: Messagi... @ Tue Oct 21, 2025 1pm - 3pm (PDT) (kumar@airmdr.com)
+domain:salesfriends.co
+domain:getsalespros.co
+recipients:airmdr@foundationcap.com not recipients:kumar@airmdr.com
+domain:andersonlanegroup.com
+domain:buildwithevery.com
+domain:solganick.com
+domain:amesa.com
+domain:coding-cops.website
+from:DoNotReply@labor.idaho.gov
+from:DArevalo@goodwinlaw.com subject:Kumar Saurabh / Eric Tan
+domain:discoversep.com
+from:manny@feedback.sumologic.com
+domain:gocymatehq.com
+domain:pivotag2.com
+from:the-messenger@mercury.com
+from:events@foundationcap.com subject:RSVP Confirmation — Compass Conversations: How AI agents are collapsing the enterprise stack
+from:noreply@mail.gatsby.events subject:Waitlist Confirmation — Compass Conversations: How AI agents are collapsing the enterprise stack
+domain:joinvenduxteam.com
+domain:notify.openclassrooms.com
+domain:phantombuster.com
+domain:hellowurthysolutions.info
+domain:netnut.net
+domain:emailflowex.org
+domain:overlooknexus.com
+from:customersuccessteam@hubspot.com
+domain:headaicoretrack.com
+domain:pleasantsolutions.com
+domain:trypraxis.xyz
+domain:agencymatchinsider.co
+domain:qs.com
+domain:tana.inc
+domain:headaicorexunion.com
+from:Shane.Forker@cbre.com
+from:sazouhair@hotmail.com
+from:no-reply@email.claude.com
+from:eric.debrine@kidder.com
+domain:meetfoundersclubteam.click
+domain:mail.adobe.com
+domain:zoominfo.com
+domain:usedemandsense.com
+domain:podcaststhe.com
+domain:heyflow.com
+domain:equiteq.com
+from:support@elastic.co recipients:ayush.gupta@airmdr.com
+domain:usemintcredits.com
+from:vrodriguez@hubspot.com
+domain:intelligentb2bleads.info
+domain:bookwithpentestking.com
+from:atoms@accel.com
+from:analytics-noreply@google.com
+domain:videobrothersmedia.com
+domain:marcusevanscy.com
+domain:babcockinteriors.com
+domain:zynern.com
