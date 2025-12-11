@@ -1112,7 +1112,9 @@ class GmailLabeler:
         domain=infoObj['domain']
         ignoreRule = f"domain:{domain}"
         self.append_ignore_rule(ignoreRule)
-        self.mark_thread_as_read(infoObj['thread_id'])
+        thread_id = infoObj['thread_id']
+        self.mark_thread_as_read(thread_id)
+        self.archive_thread(thread_id)
 
     def append_ignore_rule(self, ignoreRule):
         with open('ignoreRules.txt', 'a') as f:
@@ -2254,10 +2256,8 @@ def run_interactively():
         '7': ('Calcualte domain priority', calculate_domain_priority),
         '8': ('Prioritize last14d emails from unknown senders', prioritize_last14d_emails_unknown_senders),
         '9': ('Add priority category labels (assumes threads already have priority labels)', label_emails_w_p_category),
-        '10': ('Remove stale priority labels: p_cat_labels from archived emails, unread_high_medium from read ',
-               remove_stale_p_labels),
-        '11': (
-        'Continuously remove p_cat_labels from archived emails', continuously_remove_p_category_from_archived_emails),
+        '10': ('Remove p_cat_labels from archived emails, unread_high_medium from read ',remove_stale_p_labels),
+        '11': ('Continuously run step 10', continuously_remove_p_category_from_archived_emails),
         '12': ('Daily Email Routine', daily_email_routine),
         '13': ('Label Prioritized Emails not in inbox (rcvd in last 14d)', label_prioritized_emails_not_in_inbox),
         '14': ('Deprioritize emails with low priority subjects', update_email_hints),
