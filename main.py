@@ -1606,8 +1606,8 @@ def continuously_remove_p_category_from_archived_emails():
             print()
         except:
             pass
-        print("sleeping for 3 seconds")
-        time.sleep(3)
+        print("sleeping for 30 seconds")
+        time.sleep(30)
 
 
 def remove_unread_high_medium():
@@ -1658,7 +1658,13 @@ def remove_stale_p_labels():
     for p_cat_label in p_cat_labels:
         query = f"label:{p_cat_label} -label:inbox"
         thread_ids = labeler.search_threads_w_exclusion(query, "label:inbox", 1000)
-        print(f"Found {len(thread_ids)} for query: " + query)
+        threads = len(thread_ids)
+        if threads > 0:
+            print(f"====>>>   Found {threads} for query: " + query)
+            print()
+        else:
+            print(f"Found {threads} for query: " + query)
+            
         for thread_id in thread_ids:
             thread_details = labeler.get_thread_details(thread_id)
             sender = labeler.get_thread_sender(thread_details)
