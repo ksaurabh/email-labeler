@@ -542,13 +542,14 @@ class GmailLabeler:
         for plabel in plabels:
             label_id = self.label_id(plabel, labels)
             thread_ids = self.search_threads(f"label:inbox label:{plabel}", 10000)
-            print(f"count_by_priority_inbox: Found {len(thread_ids)} threads with label.name={plabel}", flush=True)
+            message = f"count_by_priority_inbox: Found {len(thread_ids)} threads with label.name={plabel}"
+            self.printAndCapture(message, flush=True)
             total_prioritized_thread_count += len(thread_ids)
 
         thread_ids = self.search_threads("label:inbox", 10000)
         total_threads = len(thread_ids)
-        print(f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}",
-              flush=True)
+        message = f"{total_threads} threads in inbox, prioritized thread count = {total_prioritized_thread_count}"
+        self.printAndCapture(message, flush=True)
 
         unprioritized_threads = self.unprioritized_threads_inbox()
 
@@ -584,6 +585,14 @@ class GmailLabeler:
             print(f"Found {len(thread_ids)} threads, query={query}")
         print("Search for these emails using the query: " + priorityEmailsNotInInbox + " label:prioritized")
 
+    capturedOutput = ""
+    def printAndCapture(self, output, flush=True):
+        self.capturedOutput += output + "\n"
+        print(output, flush)
+
+    def resetCapturedOutput(self):
+        self.capturedOutput = ""
+
     def unprioritized_threads_inbox(self, labelUnprioritizedThreads=False):
         unprioritized_inbox_threads_query = "label:inbox -label:@ReadyToArchive -label:p_high -label:p_medium -label:p_low -label:p_unknown"
         excluded_p_cat_queries = self.get_excluded_p_cat_label_queries()
@@ -591,9 +600,9 @@ class GmailLabeler:
         thread_ids = self.search_threads_w_multiple_exclusions(unprioritized_inbox_threads_query,
                                                                excluded_p_cat_queries, 10000)
         print()
-        print("Running search for unprioritized emails in inbox")
-        print(f"query={unprioritized_inbox_threads_query}")
-        print(f"search threads returned {len(thread_ids)} threads")
+        self.printAndCapture("Running search for unprioritized emails in inbox")
+        self.printAndCapture(f"query={unprioritized_inbox_threads_query}")
+        self.printAndCapture(f"search threads returned {len(thread_ids)} threads")
         if labelUnprioritizedThreads:
             print(f"Labeling unprioritized threads...")
             unprioritized_threads = []
@@ -605,7 +614,7 @@ class GmailLabeler:
                     self.add_label_to_thread(thread_id, unprioritized_label_id, "unprioritized")
             print()
             unprioritized_thread_count = len(unprioritized_threads)
-            print(f"unprioritized_thread_count={unprioritized_thread_count}")
+            self.printAndCapture(f"unprioritized_thread_count={unprioritized_thread_count}")
             print("You can look for these emails with query: label:inbox label:unprioritized")
 
     def get_excluded_p_cat_label_queries(self):
@@ -1664,7 +1673,7 @@ def remove_stale_p_labels():
             print()
         else:
             print(f"Found {threads} for query: " + query)
-            
+
         for thread_id in thread_ids:
             thread_details = labeler.get_thread_details(thread_id)
             sender = labeler.get_thread_sender(thread_details)
@@ -1779,10 +1788,24 @@ def label_prioritized_emails_not_in_inbox():
     return True
 
 
-def count_by_priority_inbox():
+def count_by_priority_inbox_and_save():
+    count_by_priority_inbox(True)
+
+def count_by_priority_inbox(saveStats=False):
     labeler = GmailLabeler()
     labels = labeler.get_labels()
+    labeler.resetCapturedOutput()
     labeler.count_by_priority_inbox(labels)
+
+    timestr = datetime.now().strftime("%Y_%m_%d__%H_%M_%S")
+
+    if saveStats:
+        save_path = f"inbox-{timestr}.txt"
+        with open(save_path, 'w') as f:
+            f.write(labeler.capturedOutput)
+        labeler.resetCapturedOutput()
+        print(f"Inbox stats saved to: {save_path}")
+
     return True
 
 
@@ -2251,6 +2274,7 @@ def run_interactively():
     # edit options here
     options = {
         '1': ('Inbox: Count by Priority', count_by_priority_inbox),
+        '1b': ('Inbox: Count by Priority and save stats', count_by_priority_inbox_and_save),
         '2': ('Label Emails', label_emails),
         '3': ('Process inbox unread low/unknown - no stops', process_inbox_unread_low_priority_no_stops),
         '3b': ('Process inbox unread low/unknown - with stops', process_inbox_unread_low_priority_w_stops),
